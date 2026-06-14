@@ -1,4 +1,4 @@
-# Category-to-Vector: RAG Embedding Experiment
+# RAG Embedding Experiment
 
 Benchmark how different embedding models affect retrieval-augmented generation (RAG) output quality. Run locally with Docker Compose or deploy to a Hetzner CX23 cloud server.
 
