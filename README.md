@@ -137,9 +137,6 @@ Set these in `docker-compose.yaml` under the `rag-api` service environment.
 
    This creates a CX23 (2 vCPU, 4 GB RAM) with Docker + Docker Compose installed via cloud-init. The services start automatically on boot.
 
-### Memory Management
-
-Models are loaded one at a time in subprocess isolation (`multiprocessing.spawn`). Each model is loaded in a fresh child process, and all memory is fully freed when the process exits. This prevents page-file exhaustion on Windows and allows running all models sequentially even on machines with limited RAM.
 
 ### Evaluation Metrics
 
