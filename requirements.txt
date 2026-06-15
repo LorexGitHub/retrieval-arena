@@ -2,7 +2,6 @@ fastapi
 uvicorn
 pydantic
 sentence-transformers
-peft
 streamlit
 requests
 httpx

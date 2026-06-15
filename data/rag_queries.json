@@ -103,7 +103,7 @@
     },
     {
         "id": "q_sports_2",
-        "query": "Which sport involves hitting a shuttlecock over a net with rackets?",
+        "query": "Which sport involves kicking a ball into the opponent's goal and the World Cup?",
         "ground_truth": "Soccer",
         "relevant_dataset": "sports"
     },

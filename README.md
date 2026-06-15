@@ -49,8 +49,7 @@ A containerized RAG pipeline that runs a query through multiple embedding models
 │   ├── api/
 │   │   └── rag_api.py    # FastAPI with SSE streaming
 │   └── ui/
-│       ├── rag_ui.py     # Streamlit RAG experiment dashboard
-│       └── ui.py         # Legacy dataset category manager
+│       └── rag_ui.py     # Streamlit RAG experiment dashboard
 ├── data/
 │   ├── datasets.json     # 10 category datasets (cars, cuisines, tech, etc.)
 │   └── rag_queries.json  # 20 evaluation queries with ground truth
