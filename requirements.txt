@@ -7,4 +7,4 @@ requests
 httpx
 celery[redis]==5.3.6
 redis==5.0.1
-mcp==0.4.0
+mcp==1.27.2
