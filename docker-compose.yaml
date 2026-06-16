@@ -1,34 +1,58 @@
+version: '3.8'
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   rag-api:
     build: .
-    image: rag-ensemble-api
     ports:
-      - "8002:8000"
+      - "8002:8002"
     environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app
-      - LLM_BASE_URL=${LLM_BASE_URL:-}
-      - LLM_MODEL=${LLM_MODEL:-}
-      - LLM_API_KEY=${LLM_API_KEY:-}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: uvicorn src.api.rag_api:app --host 0.0.0.0 --port 8002
+
+  celery-worker:
+    build: .
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A src.mcp.tasks worker --loglevel=info --concurrency=2
     volumes:
-      - huggingface_cache:/root/.cache/huggingface
-    restart: unless-stopped
+      - ./data:/data
+
+  mcp-server:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    command: python -m src.mcp.mcp_server
+    volumes:
+      - ./data:/data
 
   rag-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rag-ensemble-ui
+    build: .
     ports:
       - "8501:8501"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app
-      - RAG_API_URL=http://rag-api:8000
-    command: streamlit run src/ui/rag_ui.py --server.port 8501 --server.address 0.0.0.0
     depends_on:
       - rag-api
-    restart: unless-stopped
+    command: streamlit run src/ui/rag_ui.py
 
 volumes:
-  huggingface_cache:
+  redis_data:
