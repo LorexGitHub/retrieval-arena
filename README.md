@@ -157,6 +157,7 @@ Example prompt: *"Submit a RAG job to find which tech company created the iPhone
 
 ### Generator Configuration
 
+On default the App only shows result. To have a proper RAG pipeline there is also the option to integrate a proper LLM to respond via natural language
 Generator selection is explicit via environment variables (no auto-detection):
 
 | Env var                          | Behavior                                                                |
