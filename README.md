@@ -1,6 +1,6 @@
-# RAG Embedding Experiment
+# Retrieval Arena
 
-Benchmark how different embedding models affect retrieval-augmented generation (RAG) output quality. Query via the Streamlit dashboard, the FastAPI, or directly from Claude Desktop through an MCP server.
+Benchmark how different embedding models affect retrieval quality. Query via the Streamlit dashboard, the FastAPI, or directly from Claude Desktop through an MCP server.
 
 ### The Problem
 
@@ -143,7 +143,7 @@ Add this to `claude_desktop_config.json` (located at `%LOCALAPPDATA%\Packages\Cl
   "mcpServers": {
     "rag": {
       "command": "docker",
-      "args": ["exec", "-i", "rag-embedding-experiment-mcp-sse-1", "python", "/app/src/mcp/stdio_server.py"]
+      "args": ["exec", "-i", "retrieval-arena-mcp-sse-1", "python", "/app/src/mcp/stdio_server.py"]
     }
   }
 }
