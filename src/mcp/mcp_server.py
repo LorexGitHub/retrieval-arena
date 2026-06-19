@@ -19,12 +19,12 @@ RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 class JobManager:
     @staticmethod
-    def submit_job(query: str, model: str = "all", dataset: str = "tech") -> dict:
+    def submit_job(query: str, model: str = "all", dataset: str = "programming_languages", ground_truth: str = "") -> dict:
         from src.mcp.tasks import run_rag_task
-        
+
         job_id = str(uuid4())
-        task = run_rag_task.delay(job_id, query, model, dataset)
-        
+        task = run_rag_task.delay(job_id, query, model, dataset, ground_truth)
+
         return {
             "job_id": job_id,
             "celery_task_id": task.id,
@@ -90,7 +90,8 @@ async def list_tools():
                 "properties": {
                     "query": {"type": "string", "description": "User query"},
                     "model": {"type": "string", "description": "Embedding model", "default": "all"},
-                    "dataset": {"type": "string", "description": "Dataset", "default": "tech"},
+                    "dataset": {"type": "string", "description": "Dataset name", "default": "programming_languages"},
+                    "ground_truth": {"type": "string", "description": "Expected answer for evaluation", "default": ""},
                 },
                 "required": ["query"],
             },
@@ -134,7 +135,8 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:
             result = JobManager.submit_job(
                 arguments["query"],
                 arguments.get("model", "all"),
-                arguments.get("dataset", "tech"),
+                arguments.get("dataset", "programming_languages"),
+                arguments.get("ground_truth", ""),
             )
         elif name == "check_job_status":
             result = JobManager.check_status(arguments["job_id"])

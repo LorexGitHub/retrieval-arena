@@ -96,22 +96,13 @@ class _LocalLLM(Generator):
         if self._pipe is not None:
             return
         from transformers import pipeline as hf_pipeline
-        try:
-            self._pipe = hf_pipeline(
-                "text-generation",
-                model=self.model_id,
-                device_map="auto",
-                dtype="auto",
-                model_kwargs={"low_cpu_mem_usage": True},
-            )
-        except Exception:
-            self._pipe = hf_pipeline(
-                "text-generation",
-                model="HuggingFaceTB/SmolLM2-360M-Instruct",
-                device_map="auto",
-                dtype="auto",
-                model_kwargs={"low_cpu_mem_usage": True},
-            )
+        self._pipe = hf_pipeline(
+            "text-generation",
+            model=self.model_id,
+            device_map="auto",
+            dtype="auto",
+            model_kwargs={"low_cpu_mem_usage": True},
+        )
 
     def generate(self, query: str, context: list[str]) -> str:
         self._load()

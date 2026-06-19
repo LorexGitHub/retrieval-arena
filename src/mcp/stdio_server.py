@@ -1,8 +1,4 @@
-"""Stdio entry point for MCP server (for Claude Code)."""
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-
+"""Stdio entry point for MCP server (for Claude Desktop)."""
 from src.mcp.mcp_server import server
 from mcp.server.stdio import stdio_server
 import anyio

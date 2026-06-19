@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from datetime import datetime
 from typing import Optional
 
 from .config import EMBEDDING_MODELS
@@ -97,42 +96,4 @@ def run_batch(queries: list[dict], embedding_models: Optional[list[str]] = None,
     return reports
 
 
-def save_report(report: ExperimentReport, path: Optional[str] = None) -> str:
-    path = path or str(DATA_DIR / f"rag_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-    with open(path, "w") as f:
-        json.dump(report.model_dump(), f, indent=2, default=str)
-    return path
 
-
-def generate_summary(reports: list[ExperimentReport]) -> str:
-    lines = ["# RAG Experiment Summary\n"]
-    model_wins = {}
-
-    for rep in reports:
-        lines.append(f"## Query: {rep.query}")
-        lines.append(f"  Ground Truth: {rep.ground_truth}")
-        lines.append(f"  Best Model: {rep.best_model}")
-        if rep.best_model:
-            model_wins[rep.best_model] = model_wins.get(rep.best_model, 0) + 1
-
-        for name, result in rep.results.items():
-            if isinstance(result, ErrorResult):
-                lines.append(f"  - {name}: ERROR - {result.error}")
-                continue
-            metrics = result.evaluation
-            lines.append(
-                f"  - {name}: EM={metrics.exact_match}, "
-                f"RougeL={metrics.rouge_l_f1:.3f}, "
-                f"SemSim={metrics.semantic_similarity:.3f}, "
-                f"LLMScore={metrics.llm_quality_score}"
-            )
-            lines.append(f"    Retrieved: {result.retrieval.documents}")
-            lines.append(f"    Answer: {result.generation.answer}")
-        lines.append("")
-
-    lines.append("## Win Counts (best model per query)")
-    for model, wins in sorted(model_wins.items(), key=lambda x: x[1], reverse=True):
-        lines.append(f"  {model}: {wins}")
-    lines.append("")
-
-    return "\n".join(lines)

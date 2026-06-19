@@ -1,5 +1,7 @@
 """Async Celery tasks for RAG pipeline"""
+import json
 import os
+import redis
 from datetime import datetime
 from pathlib import Path
 from celery import Celery, Task
@@ -31,19 +33,16 @@ class RAGTask(Task):
 
 
 @celery_app.task(base=RAGTask, bind=True)
-def run_rag_task(self, job_id: str, query: str, model: str, dataset: str):
+def run_rag_task(self, job_id: str, query: str, model: str, dataset: str, ground_truth: str = ""):
     """Run RAG pipeline async"""
     try:
-        from rag.pipeline import RAGPipeline
-        from rag.config import EMBEDDING_MODELS
-        import json
+        from src.rag.pipeline import RAGPipeline
+        from src.rag.config import EMBEDDING_MODELS
         
         pipeline = RAGPipeline()
         
-        # Load dataset
-        from rag.experiment import load_dataset
+        from src.rag.experiment import load_dataset
         documents = load_dataset(dataset)
-        ground_truth = "placeholder"  # Get from query config
         
         models_to_run = (
             list(EMBEDDING_MODELS.keys())
@@ -82,8 +81,6 @@ def run_rag_task(self, job_id: str, query: str, model: str, dataset: str):
         with open(RESULTS_FILE, "a") as f:
             f.write(json.dumps(output) + "\n")
         
-        # Cache in Redis
-        import redis
         r = redis.from_url(redis_url)
         r.setex(f"rag:result:{job_id}", 86400, json.dumps(output))
         

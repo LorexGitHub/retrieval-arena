@@ -68,6 +68,9 @@ services:
       - "8766:8501"
     depends_on:
       - rag-api
+    environment:
+      - PYTHONPATH=/app
+      - RAG_API_URL=http://rag-api:8002
     command: streamlit run src/ui/rag_ui.py
 
 volumes:
