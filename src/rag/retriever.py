@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import multiprocessing as mp
+from typing import TYPE_CHECKING
 
 from .config import EMBEDDING_MODELS, RETRIEVAL_TOP_K
 from .schemas import RetrievalResult
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 # Config keys that should NOT be forwarded to SentenceTransformer()
 _MODEL_KWARGS_SKIP = {"model_name", "default_task", "encode_kwargs", "size", "memory", "speed"}
@@ -24,7 +30,7 @@ _MODEL_MEMORY_ESTIMATES = {
 }
 
 # In-memory model cache: populated only if enough RAM is available
-_MODEL_CACHE: dict[str, "SentenceTransformer"] = {}
+_MODEL_CACHE: dict[str, SentenceTransformer] = {}
 _MODEL_CACHE_ENABLED = False
 
 
@@ -45,7 +51,7 @@ def _check_cache_feasible() -> bool:
 _MODEL_CACHE_ENABLED = _check_cache_feasible()
 
 
-def _get_model(model_id: str, model_kwargs: dict) -> "SentenceTransformer":
+def _get_model(model_id: str, model_kwargs: dict) -> SentenceTransformer:
     from sentence_transformers import SentenceTransformer
 
     if _MODEL_CACHE_ENABLED:

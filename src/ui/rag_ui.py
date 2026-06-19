@@ -381,8 +381,10 @@ tab_single, tab_compare, tab_batch = st.tabs([
 ])
 
 def _score_color(val: float) -> str:
-    if val >= 0.8: return "var(--green)"
-    if val >= 0.5: return "var(--amber)"
+    if val >= 0.8:
+        return "var(--green)"
+    if val >= 0.5:
+        return "var(--amber)"
     return "var(--red)"
 
 def _render_sse_stage(stage_ph, message: str):
