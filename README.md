@@ -1,20 +1,18 @@
 # Retrieval Arena
 
-Benchmark how different embedding models affect retrieval quality. Query via the Streamlit dashboard, the FastAPI, or directly from Claude Desktop through an MCP server.
+A framework for benchmarking and comparing embedding models in a retrieval-augmented generation (RAG) context. Access results through a Streamlit dashboard, a REST API, or an MCP server for LLM integration.
 
 ### The Problem
 
-Different embedding models capture different semantic nuances. A query like _"A programming language named after a snake"_ might retrieve different documents depending on whether you use MiniLM, BGE, GTE, Granite, Harrier, MPNet, Qwen3, or Jina. Which model works best for your domain and dataset?
+Choosing an embedding model for a retrieval pipeline involves trade-offs between speed, memory, and retrieval quality. Models vary wildly in capability — from lightweight 33M-parameter models to high-dimensional 600M-parameter ones — and the best choice depends on your specific domain and data. Without a structured comparison, teams rely on intuition rather than empirical evidence.
 
 ### The Solution
 
-A containerized RAG pipeline with three access paths:
+A containerized evaluation platform that runs a query against multiple embedding models side-by-side and scores each result using exact match, ROUGE-L, and semantic similarity. Three access paths:
 
-- **Streamlit UI** — Interactive dashboard for single/comparison/batch runs
+- **Streamlit UI** — Interactive dashboard for single, comparison, and batch runs
 - **FastAPI** — REST + SSE streaming for programmatic access
-- **MCP Server** — Connects to Claude Desktop so you can run RAG queries via natural language
-
-All retrieval runs asynchronously via Celery workers, with results cached in Redis and persisted to disk.
+- **MCP Server** — Exposes RAG tools over the Model Context Protocol, allowing any MCP-compatible LLM to query and evaluate models externally
 
 ### Supported Embedding Models
 
