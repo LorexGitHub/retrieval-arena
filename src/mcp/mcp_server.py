@@ -141,7 +141,8 @@ async def list_tools():
                 "properties": {
                     "query": {"type": "string", "description": "User query"},
                     "model": {"type": "string", "description": "Embedding model", "default": "all"},
-                    "dataset": {"type": "string", "description": "Dataset", "default": "tech"},
+                    "dataset": {"type": "string", "description": "Dataset name", "default": "programming_languages"},
+                    "ground_truth": {"type": "string", "description": "Expected answer for evaluation", "default": ""},
                 },
                 "required": ["query"],
             },
@@ -185,7 +186,8 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:
             result = JobManager.submit_job(
                 arguments["query"],
                 arguments.get("model", "all"),
-                arguments.get("dataset", "tech"),
+                arguments.get("dataset", "programming_languages"),
+                arguments.get("ground_truth", ""),
             )
         elif name == "check_job_status":
             result = JobManager.check_status(arguments["job_id"])

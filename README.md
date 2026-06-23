@@ -1,20 +1,25 @@
-# RAG Embedding Experiment
+# Retrieval Arena
 
-Benchmark how different embedding models affect retrieval-augmented generation (RAG) output quality. Query via the Streamlit dashboard, the FastAPI, or directly from Claude Desktop through an MCP server.
+A framework for benchmarking and comparing embedding models in a retrieval-augmented generation (RAG) context. Access results through a Streamlit dashboard, a REST API, or an MCP server for LLM integration.
+
+### Demo
+
+
+https://github.com/user-attachments/assets/93e52b5e-fd6c-4495-9d49-ebdb948d0e4c
+
+
 
 ### The Problem
 
-Different embedding models capture different semantic nuances. A query like _"A programming language named after a snake"_ might retrieve different documents depending on whether you use MiniLM, BGE, GTE, Granite, Harrier, MPNet, Qwen3, or Jina. Which model works best for your domain and dataset?
+Choosing an embedding model for a retrieval pipeline involves trade-offs between speed, memory, and retrieval quality. Models vary wildly in capability — from lightweight 33M-parameter models to high-dimensional 600M-parameter ones — and the best choice depends on your specific domain and data. Without a structured comparison, teams rely on intuition rather than empirical evidence.
 
 ### The Solution
 
-A containerized RAG pipeline with three access paths:
+A containerized evaluation platform that runs a query against multiple embedding models side-by-side and scores each result using exact match, ROUGE-L, and semantic similarity. Three access paths:
 
-- **Streamlit UI** — Interactive dashboard for single/comparison/batch runs
+- **Streamlit UI** — Interactive dashboard for single, comparison, and batch runs
 - **FastAPI** — REST + SSE streaming for programmatic access
-- **MCP Server** — Connects to Claude Desktop so you can run RAG queries via natural language
-
-All retrieval runs asynchronously via Celery workers, with results cached in Redis and persisted to disk.
+- **MCP Server** — Exposes RAG tools over the Model Context Protocol, allowing any MCP-compatible LLM to query and evaluate models externally
 
 ### Supported Embedding Models
 
@@ -41,26 +46,27 @@ All retrieval runs asynchronously via Celery workers, with results cached in Red
 │   ├── rag/              # RAG pipeline package
 │   │   ├── config.py     # Environment-based configuration + model registry
 │   │   ├── schemas.py    # Pydantic request/response models
-│   │   ├── retriever.py  # Subprocess-isolated embedding retrieval
+│   │   ├── retriever.py  # In-process model caching with subprocess fallback
 │   │   ├── generator.py  # LLM/template answer generation
-│   │   ├── evaluator.py  # Evaluation metrics (EM, ROUGE, similarity, LLM)
+│   │   ├── evaluator.py  # Evaluation metrics (EM, ROUGE, semantic sim, LLM judge)
 │   │   ├── pipeline.py   # Orchestrates retrieval + generation + evaluation
 │   │   └── experiment.py # Batch experiment runner
 │   ├── api/
 │   │   └── rag_api.py    # FastAPI with SSE streaming
 │   ├── mcp/
-│   │   ├── mcp_server.py # MCP SSE server (exposes tools over SSE)
+│   │   ├── mcp_server.py # MCP SSE server (exposes tools over HTTP/SSE)
 │   │   ├── stdio_server.py # Stdio entry point for Claude Desktop
 │   │   └── tasks.py      # Celery async tasks
 │   └── ui/
 │       └── rag_ui.py     # Streamlit RAG experiment dashboard
 ├── data/
-│   ├── datasets.json     # 10 category datasets (cars, cuisines, tech, etc.)
+│   ├── datasets.json     # 11 category datasets (cars, cuisines, programming, etc.)
 │   └── rag_queries.json  # 20 evaluation queries with ground truth
 ├── infra/
-│   └── main.tf           # Terraform for Hetzner CX23
-├── Dockerfile            # Python 3.12, CPU-based torch
-├── docker-compose.yaml   # 5 services (redis, rag-api, celery-worker, mcp-sse, rag-ui)
+│   ├── main.tf           # Terraform for Hetzner CX23
+│   └── nginx.conf        # Reverse proxy (MCP + Streamlit on port 80)
+├── Dockerfile            # Python 3.12, CPU-based PyTorch
+├── docker-compose.yaml   # 6 services (redis, rag-api, celery-worker, mcp-sse, nginx, rag-ui)
 └── requirements.txt
 ```
 
@@ -86,7 +92,8 @@ All retrieval runs asynchronously via Celery workers, with results cached in Red
                               │ docker exec -i
                      ┌────────▼────────┐
                      │    mcp-sse      │
-                     │  (SSE server)   │
+                     │  (HTTP/SSE)     │
+                     │  port 5100      │
                      └────────┬────────┘
                               │ Celery task
                      ┌────────▼────────┐
@@ -105,7 +112,10 @@ All retrieval runs asynchronously via Celery workers, with results cached in Red
      │   cache)      │ │           │ │            │
      └───────────────┘ └────────────┘ └────────────┘
 
-  Streamlit UI ──► rag-api ──► (direct RAG, no Celery)
+  Browser ──► nginx:80 ──┬──► rag-ui:8501 (Streamlit)
+                         └──► mcp-sse:5100 (/mcp/)
+
+  Streamlit UI ──► rag-api:8002 ──► (direct RAG, no Celery)
 ```
 
 ### Getting Started (Local)
@@ -138,7 +148,7 @@ Add this to `claude_desktop_config.json` (located at `%LOCALAPPDATA%\Packages\Cl
   "mcpServers": {
     "rag": {
       "command": "docker",
-      "args": ["exec", "-i", "rag-embedding-experiment-mcp-sse-1", "python", "/app/src/mcp/stdio_server.py"]
+      "args": ["exec", "-i", "retrieval-arena-mcp-sse-1", "python", "/app/src/mcp/stdio_server.py"]
     }
   }
 }
@@ -153,20 +163,20 @@ Restart Claude Desktop — you'll see a hammer icon with 4 tools:
 | `list_cached_results` | Browse recent results |
 | `get_cached_result` | Fetch specific result by job_id |
 
+The `submit_rag_job` tool also accepts an optional `ground_truth` parameter for evaluation. If omitted, evaluation metrics (EM, ROUGE-L, semantic similarity) will not be meaningful.
+
 Example prompt: *"Submit a RAG job to find which tech company created the iPhone using minilm-l12 on the tech_companies dataset"*
 
 ### Generator Configuration
 
-Generator selection is explicit via environment variables (no auto-detection):
+By default the app returns the top retrieved document as the "answer" (template mode). To use a real LLM, set environment variables on the `rag-api` service in `docker-compose.yaml`:
 
-| Env var                          | Behavior                                                                |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| (none set)                       | `_TemplateGenerator` — returns top retrieved document                   |
-| `LLM_BASE_URL`                   | OpenAI-compatible API (e.g., vLLM, OpenAI); set `LLM_API_KEY` if needed |
-| `LLM_MODEL` or `LOCAL_LLM_MODEL` | Local HuggingFace model                                                 |
-| `LLM_USE_OLLAMA=1`               | Ollama (uses `OLLAMA_BASE_URL`, default `http://localhost:11434`)       |
-
-Set these in `docker-compose.yaml` under the `rag-api` service environment.
+| Env var                          | Behavior                                                             |
+| -------------------------------- | -------------------------------------------------------------------- |
+| (none set)                       | Returns top retrieved document                                       |
+| `LLM_BASE_URL`                   | OpenAI-compatible API (vLLM, OpenAI, etc.); set `LLM_API_KEY` if needed |
+| `LLM_MODEL`                      | Local HuggingFace model (key or full model ID)                       |
+| `LLM_USE_OLLAMA=1`               | Ollama (uses `OLLAMA_BASE_URL`, default `http://localhost:11434`)    |
 
 ### API Endpoints (FastAPI)
 

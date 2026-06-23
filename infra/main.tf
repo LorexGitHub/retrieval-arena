@@ -94,7 +94,7 @@ resource "hcloud_server" "rag" {
       - usermod -aG docker ubuntu
       - mkdir -p /opt/rag-ensemble
       - cd /opt/rag-ensemble
-      - git clone https://github.com/LorexGitHub/rag-embedding-experiment.git .
+      - git clone https://github.com/LorexGitHub/retrieval-arena.git .
       - docker compose pull
       - docker compose up -d
   EOF
