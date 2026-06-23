@@ -13,43 +13,94 @@ from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
 server = Server("rag-mcp")
-RESULTS_FILE = Path(os.getenv("RESULTS_DIR", "/data")) / "results.jsonl"
+RESULTS_DIR = Path(os.getenv("RESULTS_DIR", "/data"))
+RESULTS_FILE = RESULTS_DIR / "results.jsonl"
 RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
 class JobManager:
     @staticmethod
     def submit_job(query: str, model: str = "all", dataset: str = "tech") -> dict:
-        from src.mcp.tasks import run_rag_task
-        
+        try:
+            from src.mcp.tasks import run_rag_task
+
+            job_id = str(uuid4())
+            task = run_rag_task.delay(job_id, query, model, dataset)
+            return {
+                "job_id": job_id,
+                "celery_task_id": task.id,
+                "status": "queued",
+                "query": query,
+                "model": model,
+                "dataset": dataset,
+                "submitted_at": datetime.utcnow().isoformat(),
+            }
+        except Exception:
+            logger.warning("Celery/Redis unavailable — running synchronously")
+            return JobManager._run_sync(query, model, dataset)
+
+    @staticmethod
+    def _run_sync(query: str, model: str = "all", dataset: str = "tech") -> dict:
         job_id = str(uuid4())
-        task = run_rag_task.delay(job_id, query, model, dataset)
-        
-        return {
+        from rag.pipeline import RAGPipeline
+        from rag.config import EMBEDDING_MODELS
+        from rag.experiment import load_dataset
+
+        pipeline = RAGPipeline()
+        documents = load_dataset(dataset)
+        models_to_run = (
+            list(EMBEDDING_MODELS.keys()) if model == "all" else [model]
+        )
+
+        results = []
+        for m in models_to_run:
+            try:
+                result = pipeline.run(
+                    query=query, documents=documents,
+                    ground_truth="placeholder", dataset_name=dataset,
+                    embedding_model=m,
+                )
+                results.append(result.model_dump())
+            except Exception as e:
+                results.append({"error": str(e), "model": m, "query": query})
+
+        output = {
             "job_id": job_id,
-            "celery_task_id": task.id,
-            "status": "queued",
             "query": query,
-            "model": model,
             "dataset": dataset,
-            "submitted_at": datetime.utcnow().isoformat(),
+            "models_run": models_to_run,
+            "results": results,
+            "completed_at": datetime.utcnow().isoformat(),
+            "status": "completed",
         }
-    
+
+        RESULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(RESULTS_FILE, "a") as f:
+            f.write(json.dumps(output) + "\n")
+
+        return output
+
     @staticmethod
     def check_status(job_id: str) -> dict:
         from src.mcp.tasks import celery_app
-        
-        result = celery_app.backend.get(f"rag:result:{job_id}")
-        if result:
-            return json.loads(result)
-        
+
+        try:
+            result = celery_app.backend.get(f"rag:result:{job_id}")
+            if result:
+                return json.loads(result)
+        except Exception:
+            pass
+
+        cached = JobManager.get_result(job_id)
+        if cached:
+            return cached
         return {"job_id": job_id, "status": "not_found"}
-    
+
     @staticmethod
     def list_results(limit: int = 50, filter_model: str = None) -> list:
         if not RESULTS_FILE.exists():
             return []
-        
+
         results = []
         with open(RESULTS_FILE, "r") as f:
             for line in f:
@@ -60,14 +111,14 @@ class JobManager:
                     results.append(result)
                 except json.JSONDecodeError:
                     pass
-        
+
         return results[:limit]
-    
+
     @staticmethod
     def get_result(job_id: str) -> dict:
         if not RESULTS_FILE.exists():
             return None
-        
+
         with open(RESULTS_FILE, "r") as f:
             for line in f:
                 try:

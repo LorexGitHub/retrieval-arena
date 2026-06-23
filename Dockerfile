@@ -13,4 +13,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.api.rag_api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.combined_app:app", "--host", "0.0.0.0", "--port", "8000"]
