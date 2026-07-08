@@ -5,10 +5,6 @@ from .schemas import RAGResult, GenerationResult
 
 
 class RAGPipeline:
-    def __init__(self):
-        self.generator = get_generator()
-        self.evaluator = Evaluator()
-
     def run(
         self,
         query: str,
@@ -17,18 +13,20 @@ class RAGPipeline:
         dataset_name: str,
         embedding_model: str,
         top_k: int = 5,
+        llm_model: str | None = None,
         on_stage: callable = None,
     ) -> RAGResult:
         if on_stage:
             on_stage("Loading model...")
-        retrieval = Retriever.retrieve(query, documents, embedding_model, top_k)
+        retrieval = Retriever.retrieve(query, documents, embedding_model, top_k, dataset_name)
         if on_stage:
             on_stage("Generating answer...")
-        answer = self.generator.generate(query, retrieval.documents)
+        generator = get_generator(llm_model)
+        answer = generator.generate(query, retrieval.documents)
         if on_stage:
             on_stage("Evaluating...")
         evaluation = self.evaluator.evaluate(
-            query, answer, retrieval.documents, ground_truth
+            query, answer, retrieval.documents, ground_truth, document_ids=retrieval.document_ids,
         )
         return RAGResult(
             query=query,
@@ -43,3 +41,8 @@ class RAGPipeline:
             ),
             evaluation=evaluation,
         )
+
+    @property
+    def evaluator(self):
+        from .evaluator import Evaluator
+        return Evaluator()

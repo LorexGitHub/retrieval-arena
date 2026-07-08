@@ -1,13 +1,6 @@
 # Retrieval Arena
 
-A framework for benchmarking and comparing embedding models in a retrieval-augmented generation (RAG) context. Access results through a Streamlit dashboard, a REST API, or an MCP server for LLM integration.
-
-### Demo
-
-
-https://github.com/user-attachments/assets/93e52b5e-fd6c-4495-9d49-ebdb948d0e4c
-
-
+A framework for benchmarking and comparing embedding models in a retrieval-augmented generation (RAG) context. Access results through a React SPA, a REST API, or an MCP server for LLM integration.
 
 ### The Problem
 
@@ -15,9 +8,9 @@ Choosing an embedding model for a retrieval pipeline involves trade-offs between
 
 ### The Solution
 
-A containerized evaluation platform that runs a query against multiple embedding models side-by-side and scores each result using exact match, ROUGE-L, and semantic similarity. Three access paths:
+A containerized evaluation platform that runs a query against multiple embedding models side-by-side and scores each result using 10 metrics (4 retrieval + 6 generation). Three access paths:
 
-- **Streamlit UI** — Interactive dashboard for single, comparison, and batch runs
+- **React SPA** — Dark-themed dashboard with SSE real-time progress, run comparisons, browse results, manage datasets
 - **FastAPI** — REST + SSE streaming for programmatic access
 - **MCP Server** — Exposes RAG tools over the Model Context Protocol, allowing any MCP-compatible LLM to query and evaluate models externally
 
@@ -50,37 +43,41 @@ A containerized evaluation platform that runs a query against multiple embedding
 │   │   ├── generator.py  # LLM/template answer generation
 │   │   ├── evaluator.py  # Evaluation metrics (EM, ROUGE, semantic sim, LLM judge)
 │   │   ├── pipeline.py   # Orchestrates retrieval + generation + evaluation
+│   │   ├── database.py   # PostgreSQL layer with JSON file fallback
 │   │   └── experiment.py # Batch experiment runner
 │   ├── api/
-│   │   └── rag_api.py    # FastAPI with SSE streaming
+│   │   └── rag_api.py    # FastAPI with SSE streaming + static file serving
 │   ├── mcp/
 │   │   ├── mcp_server.py # MCP SSE server (exposes tools over HTTP/SSE)
 │   │   ├── stdio_server.py # Stdio entry point for Claude Desktop
 │   │   └── tasks.py      # Celery async tasks
-│   └── ui/
-│       └── rag_ui.py     # Streamlit RAG experiment dashboard
+│   └── combined_app.py   # Routes /mcp* → MCP, everything else → FastAPI + SPA
+├── rag-ui/               # React frontend (Vite + Tailwind + shadcn/ui)
+│   ├── src/
+│   │   ├── components/   # 18 components (layout, benchmark, ui primitives)
+│   │   ├── hooks/        # useDatasets, SSE integration
+│   │   ├── lib/          # API client, cn() utility
+│   │   └── types/        # TypeScript interfaces matching Pydantic schemas
+│   ├── package.json
+│   └── vite.config.ts
 ├── data/
 │   ├── datasets.json     # 11 category datasets (cars, cuisines, programming, etc.)
-│   └── rag_queries.json  # 20 evaluation queries with ground truth
+│   ├── rag_queries.json  # 20 evaluation queries with ground truth
+│   └── vector_cache/     # Local file-based embedding cache
 ├── infra/
 │   ├── main.tf           # Terraform for Hetzner CX23
-│   └── nginx.conf        # Reverse proxy (MCP + Streamlit on port 80)
-├── Dockerfile            # Python 3.12, CPU-based PyTorch
-├── docker-compose.yaml   # 6 services (redis, rag-api, celery-worker, mcp-sse, nginx, rag-ui)
+│   └── nginx.conf        # Reverse proxy config
+├── Dockerfile            # Multi-stage: Node builds frontend, Python serves it
+├── docker-compose.yaml   # 6 services (postgres, redis, rag-api, combined, celery-worker, mcp-sse)
 └── requirements.txt
 ```
 
 ### Tech Stack
 
-- **Language**: Python 3.12
-- **API**: FastAPI + Uvicorn with SSE streaming
-- **ML**: Sentence-Transformers, PyTorch (CPU)
-- **Retrieval**: Subprocess isolation (`multiprocessing.spawn`) per model, with in-process fallback for Celery workers
-- **Async tasks**: Celery + Redis broker/backend
-- **Frontend**: Streamlit with custom dark theme
-- **MCP**: Model Context Protocol server for Claude Desktop integration
-- **Infrastructure**: Docker Compose (local), Terraform + Hetzner (cloud)
-- **Generator backends**: Local HF, OpenAI-compatible, Ollama, template fallback
+- **Frontend**: React 19, Tailwind CSS v4, shadcn/ui, Vite
+- **Backend**: Python 3.12, FastAPI, Celery + Redis, Sentence-Transformers
+- **Database**: PostgreSQL 16 (psycopg2), local file-based vector cache
+- **Infrastructure**: Docker Compose, Terraform + Hetzner (cloud), Nginx
 
 ### Architecture
 
@@ -112,10 +109,11 @@ A containerized evaluation platform that runs a query against multiple embedding
      │   cache)      │ │           │ │            │
      └───────────────┘ └────────────┘ └────────────┘
 
-  Browser ──► nginx:80 ──┬──► rag-ui:8501 (Streamlit)
-                         └──► mcp-sse:5100 (/mcp/)
+  Browser ──► nginx:80 ──► combined:8000 (SPA + API + /mcp/)
+                      or ──► rag-api:8002 (API only)
+                      or ──► mcp-sse:5100 (MCP only)
 
-  Streamlit UI ──► rag-api:8002 ──► (direct RAG, no Celery)
+  React SPA ──► /api/* ──► FastAPI (direct RAG, SSE streaming)
 ```
 
 ### Getting Started (Local)
@@ -128,16 +126,28 @@ A containerized evaluation platform that runs a query against multiple embedding
    ```
 
 2. Access the services:
-   | Service        | URL                             |
-   |----------------|---------------------------------|
-   | Streamlit UI   | http://localhost:8766           |
-   | FastAPI        | http://localhost:8765           |
-   | MCP SSE        | http://localhost:5100/mcp/      |
+   | Service       | URL                             |
+   |---------------|---------------------------------|
+   | React SPA     | http://localhost:8000           |
+   | FastAPI       | http://localhost:8765           |
+   | MCP SSE       | http://localhost:5100/mcp/      |
 
 3. Stop:
    ```bash
    docker compose down
    ```
+
+### Frontend Development
+
+Run the React dev server with hot reload (proxies `/api` to the FastAPI backend):
+
+```bash
+cd rag-ui
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5173` — points `/api/*` requests to `http://localhost:8002`.
 
 ### Connecting Claude Desktop
 
@@ -154,16 +164,21 @@ Add this to `claude_desktop_config.json` (located at `%LOCALAPPDATA%\Packages\Cl
 }
 ```
 
-Restart Claude Desktop — you'll see a hammer icon with 4 tools:
+Restart Claude Desktop — you'll see a hammer icon with 9 tools:
 
 | Tool | Purpose |
 |---|---|
+| `list_datasets` | List available datasets |
+| `list_queries` | List evaluation queries |
 | `submit_rag_job` | Submit async RAG query (returns job_id) |
 | `check_job_status` | Poll job result by ID |
 | `list_cached_results` | Browse recent results |
 | `get_cached_result` | Fetch specific result by job_id |
+| `get_dataset` | Get dataset documents by name |
+| `create_dataset` | Create or overwrite a dataset |
+| `delete_dataset` | Delete a dataset |
 
-The `submit_rag_job` tool also accepts an optional `ground_truth` parameter for evaluation. If omitted, evaluation metrics (EM, ROUGE-L, semantic similarity) will not be meaningful.
+The `submit_rag_job` tool also accepts an optional `ground_truth` parameter for evaluation. If omitted, evaluation metrics will not be meaningful.
 
 Example prompt: *"Submit a RAG job to find which tech company created the iPhone using minilm-l12 on the tech_companies dataset"*
 
@@ -180,14 +195,33 @@ By default the app returns the top retrieved document as the "answer" (template 
 
 ### API Endpoints (FastAPI)
 
-- `GET /models` — List available embedding models
-- `GET /datasets` — List available datasets
-- `GET /datasets/{name}` — Get categories for a dataset
-- `POST /datasets/{name}` — Update categories
-- `GET /queries` — List evaluation queries
-- `POST /run` — Single-model RAG with SSE streaming
-- `POST /compare` — All-model comparison with per-model SSE progress
-- `POST /run-batch` — Batch experiment across 20 queries
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/models` | List available embedding models |
+| GET | `/api/datasets` | List available datasets |
+| GET | `/api/datasets/{name}/documents` | Get dataset documents |
+| PUT | `/api/datasets/{name}` | Create or overwrite a dataset |
+| DELETE | `/api/datasets/{name}` | Delete a dataset |
+| GET | `/api/queries` | List evaluation queries |
+| POST | `/api/run` | Single-model RAG with SSE streaming |
+| POST | `/api/compare` | Multi-model comparison with per-model SSE progress |
+| POST | `/api/run-batch` | Batch experiment across all queries |
+
+### Evaluation Metrics
+
+**Retrieval (4):**
+- **Hit Rate@k** — Was the relevant document in the top-k results?
+- **MRR@k** — Mean reciprocal rank of the first relevant result
+- **Precision@k** — Fraction of relevant documents in top-k
+- **NDCG@k** — Discounted cumulative gain (position-weighted)
+
+**Generation (6):**
+- **Exact Match** — Binary match between answer and ground truth
+- **ROUGE-L F1** — Longest common subsequence overlap
+- **Semantic Similarity** — Cosine similarity between answer and ground truth embeddings
+- **Faithfulness** — Does the answer stay factual relative to retrieved documents? (requires LLM judge)
+- **Answer Relevancy** — How well does the answer address the query? (requires LLM judge)
+- **LLM Quality Score** — 1-5 rating from a judge LLM (requires LLM judge)
 
 ### Cloud Deployment (Hetzner)
 
@@ -205,9 +239,6 @@ By default the app returns the top retrieved document as the "answer" (template 
 
    This creates a CX23 (2 vCPU, 4 GB RAM) with Docker + Docker Compose installed via cloud-init.
 
-### Evaluation Metrics
+### Local File-Based Vector Cache
 
-- **Substring Match**: Binary — is the ground truth found within the generated answer?
-- **ROUGE-L F1**: Measures longest common subsequence overlap
-- **Semantic Similarity**: Cosine similarity between answer and ground truth embeddings
-- **LLM Quality Score**: 1–5 rating from a judge LLM (requires generator LLM)
+Vectors and results are cached locally in `data/vector_cache/{model}/{dataset}/{hash}.json` — no cloud dependency, no API key needed. Cache is keyed by SHA256 hash of the concatenated document texts.

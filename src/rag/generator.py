@@ -2,31 +2,9 @@ import os
 import json
 import urllib.request
 import urllib.error
+import multiprocessing as mp
 
 from .config import LLM_MODELS, DEFAULT_LLM, LLM_BASE_URL, LLM_API_KEY, GENERATOR
-
-_LLM_INSTANCE = None
-
-
-def get_generator():
-    global _LLM_INSTANCE
-    if _LLM_INSTANCE is not None:
-        return _LLM_INSTANCE
-
-    model_key_or_path = DEFAULT_LLM or os.getenv("LOCAL_LLM_MODEL", "")
-    base_url = LLM_BASE_URL
-
-    if base_url:
-        model = model_key_or_path or "local-model"
-        _LLM_INSTANCE = _OpenAIGenerator(base_url, model, LLM_API_KEY)
-    elif model_key_or_path:
-        model_id = LLM_MODELS.get(model_key_or_path, model_key_or_path)
-        _LLM_INSTANCE = _LocalLLM(model_id)
-    elif os.getenv("LLM_USE_OLLAMA") == "1":
-        _LLM_INSTANCE = _OllamaGenerator()
-    else:
-        _LLM_INSTANCE = _TemplateGenerator()
-    return _LLM_INSTANCE
 
 
 class Generator:
@@ -42,8 +20,6 @@ class _TemplateGenerator(Generator):
 
 
 class _OpenAIGenerator(Generator):
-    """Connect to any OpenAI-compatible API (OpenAI, LM Studio, Ollama, etc.)."""
-
     def __init__(self, base_url: str, model: str, api_key: str = ""):
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -71,11 +47,7 @@ class _OpenAIGenerator(Generator):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers=headers,
-        )
+        req = urllib.request.Request(url, data=payload, headers=headers)
         try:
             resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
@@ -85,35 +57,29 @@ class _OpenAIGenerator(Generator):
         return data["choices"][0]["message"]["content"].strip()
 
 
-class _LocalLLM(Generator):
-    """Load any HuggingFace causal LM via transformers."""
-
-    def __init__(self, model_id: str):
-        self.model_id = model_id
-        self._pipe = None
-
-    def _load(self):
-        if self._pipe is not None:
-            return
+def _llm_worker(model_id: str, query: str, context: list[str], result_queue: mp.Queue):
+    """Load model, generate, and return result. Runs in child process so memory is freed on exit."""
+    try:
         from transformers import pipeline as hf_pipeline
-        self._pipe = hf_pipeline(
-            "text-generation",
-            model=self.model_id,
-            device_map="auto",
-            dtype="auto",
-            model_kwargs={"low_cpu_mem_usage": True},
-        )
-
-    def generate(self, query: str, context: list[str]) -> str:
-        self._load()
+        kwargs = {
+            "model": model_id,
+            "dtype": "auto",
+            "model_kwargs": {"low_cpu_mem_usage": True},
+        }
+        try:
+            import accelerate  # noqa: F401
+            kwargs["device_map"] = "auto"
+        except ImportError:
+            pass
+        pipe = hf_pipeline("text-generation", **kwargs)
         context_str = ", ".join(context)
 
-        if self._pipe.tokenizer.chat_template:
+        if pipe.tokenizer.chat_template:
             messages = [
                 {"role": "system", "content": f"You have access to this context: {context_str}. Answer concisely."},
                 {"role": "user", "content": query},
             ]
-            prompt = self._pipe.tokenizer.apply_chat_template(
+            prompt = pipe.tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
             )
         else:
@@ -123,17 +89,46 @@ class _LocalLLM(Generator):
                 f"Answer:"
             )
 
-        result = self._pipe(
+        result = pipe(
             prompt,
             max_new_tokens=64,
             temperature=0.1,
             do_sample=False,
             repetition_penalty=1.2,
-            eos_token_id=self._pipe.tokenizer.eos_token_id,
-            pad_token_id=self._pipe.tokenizer.pad_token_id or self._pipe.tokenizer.eos_token_id,
+            eos_token_id=pipe.tokenizer.eos_token_id,
+            pad_token_id=pipe.tokenizer.pad_token_id or pipe.tokenizer.eos_token_id,
         )
         text = result[0]["generated_text"][len(prompt):].strip()
-        return text.split("\n")[0][:200]
+        result_queue.put({"answer": text.split("\n")[0][:200]})
+    except Exception as e:
+        result_queue.put({"error": str(e)})
+
+
+class _LocalLLM(Generator):
+    """Load any HuggingFace causal LM via subprocess (frees memory after each call)."""
+
+    def __init__(self, model_id: str):
+        self.model_id = model_id
+
+    def generate(self, query: str, context: list[str]) -> str:
+        ctx = mp.get_context("spawn")
+        q = ctx.Queue()
+        p = ctx.Process(
+            target=_llm_worker,
+            args=(self.model_id, query, context, q),
+        )
+        p.start()
+        try:
+            data = q.get(timeout=600)
+        except Exception:
+            p.terminate()
+            p.join(timeout=10)
+            raise RuntimeError("LLM subprocess timed out")
+        p.join(timeout=10)
+
+        if "error" in data:
+            raise RuntimeError(data["error"])
+        return data["answer"]
 
 
 class _OllamaGenerator(Generator):
@@ -171,3 +166,31 @@ class _OllamaGenerator(Generator):
         resp = urllib.request.urlopen(req, timeout=120)
         data = json.loads(resp.read())
         return data.get("response", "").strip()
+
+
+def get_generator(llm_model: str | None = None) -> Generator:
+    """Create a generator for the given LLM model key.
+    
+    - llm_model == ""  → TemplateGenerator (user explicitly chose no LLM)
+    - llm_model is a key in LLM_MODELS → that HuggingFace model
+    - llm_model is None → fall back to environment-based configuration
+    """
+    if llm_model == "":
+        return _TemplateGenerator()
+    if llm_model and llm_model in LLM_MODELS:
+        model_id = LLM_MODELS[llm_model]["model_name"]
+        return _LocalLLM(model_id)
+
+    model_key_or_path = DEFAULT_LLM or os.getenv("LOCAL_LLM_MODEL", "")
+    base_url = LLM_BASE_URL
+
+    if base_url:
+        model = model_key_or_path or "local-model"
+        return _OpenAIGenerator(base_url, model, LLM_API_KEY)
+    if model_key_or_path:
+        entry = LLM_MODELS.get(model_key_or_path)
+        model_id = entry["model_name"] if isinstance(entry, dict) else model_key_or_path
+        return _LocalLLM(model_id)
+    if os.getenv("LLM_USE_OLLAMA") == "1":
+        return _OllamaGenerator()
+    return _TemplateGenerator()

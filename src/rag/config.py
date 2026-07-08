@@ -81,17 +81,50 @@ EMBEDDING_MODELS = {
 
 LLM_MODELS = {
     # --- Tiny models (< 1 GB RAM) ---
-    "smol":        "HuggingFaceTB/SmolLM2-135M-Instruct",
-    "smol360":     "HuggingFaceTB/SmolLM2-360M-Instruct",
-
+    "smol": {
+        "model_name": "HuggingFaceTB/SmolLM2-135M-Instruct",
+        "size": "135M params",
+        "memory": "~270 MB",
+        "speed": "fast",
+    },
+    "smol360": {
+        "model_name": "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "size": "360M params",
+        "memory": "~720 MB",
+        "speed": "fast",
+    },
     # --- Small models (1-2 GB, already cached) ---
-    "qwen2":       "Qwen/Qwen2.5-0.5B-Instruct",
-    "qwen1.5":     "Qwen/Qwen2.5-1.5B-Instruct",
-
+    "qwen2": {
+        "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
+        "size": "0.5B params",
+        "memory": "~1 GB",
+        "speed": "fast",
+    },
+    "qwen1.5": {
+        "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+        "size": "1.5B params",
+        "memory": "~3 GB",
+        "speed": "medium",
+    },
     # --- Medium models (2-4 GB) ---
-    "tinyllama":   "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    "glm-edge":    "THUDM/glm-edge-1.5b-chat",
-    "glm4":        "THUDM/glm-4-9b-chat",
+    "tinyllama": {
+        "model_name": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        "size": "1.1B params",
+        "memory": "~2.5 GB",
+        "speed": "medium",
+    },
+    "glm-edge": {
+        "model_name": "THUDM/glm-edge-1.5b-chat",
+        "size": "1.5B params",
+        "memory": "~3 GB",
+        "speed": "medium",
+    },
+    "glm4": {
+        "model_name": "THUDM/glm-4-9b-chat",
+        "size": "9B params",
+        "memory": "~18 GB",
+        "speed": "slow",
+    },
 }
 
 DEFAULT_LLM = os.getenv("LLM_MODEL", "")

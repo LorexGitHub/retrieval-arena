@@ -7,6 +7,7 @@ class RetrievalResult(BaseModel):
     scores: list[float]
     model_name: str
     top_k: int
+    document_ids: list[str] = []
 
 
 class GenerationResult(BaseModel):
@@ -17,9 +18,17 @@ class GenerationResult(BaseModel):
 
 
 class EvaluationMetrics(BaseModel):
+    # Retrieval metrics (embedding model in isolation)
+    hit_rate: float = 0.0
+    mrr: float = 0.0
+    precision: float = 0.0
+    ndcg: float = 0.0
+    # Generation metrics (impact on LLM)
     exact_match: bool
     rouge_l_f1: float
     semantic_similarity: float
+    faithfulness: Optional[float] = None
+    answer_relevancy: Optional[float] = None
     llm_quality_score: Optional[float] = None
 
 

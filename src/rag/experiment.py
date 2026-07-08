@@ -11,18 +11,30 @@ DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
 def load_queries(path: Optional[str] = None) -> list[dict]:
+    from .database import is_available as db_available, get_queries
+
+    if db_available():
+        return get_queries()
     path = path or str(DATA_DIR / "rag_queries.json")
     with open(path) as f:
         return json.load(f)
 
 
-def load_dataset(name: str) -> list[str]:
+def load_dataset(name: str) -> list[str] | list[dict]:
+    from .database import is_available as db_available, get_dataset_documents
+
+    if db_available():
+        return get_dataset_documents(name)
     datasets_path = DATA_DIR / "datasets.json"
     with open(datasets_path) as f:
         datasets = json.load(f)
     if name not in datasets:
         raise ValueError(f"Dataset '{name}' not found in datasets.json")
-    return datasets[name]
+    items = datasets[name]
+    # Normalize flat arrays (old format) to {id, text} dicts
+    if items and isinstance(items[0], str):
+        return [{"id": item, "text": item} for item in items]
+    return items
 
 
 def run_experiment(cfg: ExperimentConfig) -> ExperimentReport:

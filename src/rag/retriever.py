@@ -115,13 +115,36 @@ class Retriever:
     def retrieve(
         cls,
         query: str,
-        documents: list[str],
+        documents: list[str] | list[dict],
         model_name: str,
         top_k: int = RETRIEVAL_TOP_K,
+        dataset_name: str = "",
     ) -> RetrievalResult:
         resolved = _MODEL_NAME_MAP.get(model_name.lower())
         if resolved is None:
             raise KeyError(f"Unknown embedding model: {model_name}")
+
+        # Normalize: extract texts and IDs whether input is list[str] or list[dict]
+        if documents and isinstance(documents[0], dict):
+            doc_ids = [d["id"] for d in documents]
+            doc_texts = [d["text"] for d in documents]
+        else:
+            doc_ids = list(documents)
+            doc_texts = list(documents)
+
+        from .vector_cache import get_cached, set_cache
+
+        if dataset_name:
+            cached = get_cached(query, resolved, dataset_name)
+            if cached is not None:
+                return RetrievalResult(
+                    documents=cached["documents"],
+                    scores=cached["scores"],
+                    model_name=resolved,
+                    top_k=top_k,
+                    document_ids=cached.get("document_ids", []),
+                )
+
         model_cfg = EMBEDDING_MODELS[resolved]
         model_id = model_cfg["model_name"]
 
@@ -136,13 +159,13 @@ class Retriever:
             encode_kwargs.update(extra_encode)
 
         if _MODEL_CACHE_ENABLED or mp.current_process().daemon:
-            docs, scores = _retrieve_sync(query, documents, model_id, model_kwargs, encode_kwargs, top_k)
+            docs, scores = _retrieve_sync(query, doc_texts, model_id, model_kwargs, encode_kwargs, top_k)
         else:
             ctx = mp.get_context("spawn")
             q = ctx.Queue()
             p = ctx.Process(
                 target=_retrieve_worker,
-                args=(query, documents, model_id, model_kwargs, encode_kwargs, top_k, q),
+                args=(query, doc_texts, model_id, model_kwargs, encode_kwargs, top_k, q),
             )
             p.start()
             try:
@@ -157,9 +180,29 @@ class Retriever:
                 raise RuntimeError(data["error"])
             docs, scores = data["documents"], data["scores"]
 
-        return RetrievalResult(
+        # Map result indices back to IDs
+        result_ids = [doc_ids[doc_texts.index(d)] for d in docs]
+
+        result = RetrievalResult(
             documents=docs,
             scores=scores,
             model_name=resolved,
             top_k=top_k,
+            document_ids=result_ids,
         )
+
+        if dataset_name:
+            try:
+                from sentence_transformers import SentenceTransformer
+                model_obj = SentenceTransformer(model_id, **model_kwargs)
+                query_vec = model_obj.encode(query, convert_to_tensor=False, **encode_kwargs).tolist()
+                set_cache(query, resolved, dataset_name, {
+                    "documents": docs,
+                    "scores": scores,
+                    "model_name": resolved,
+                    "document_ids": result_ids,
+                }, query_vec)
+            except Exception:
+                pass
+
+        return result

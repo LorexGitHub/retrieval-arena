@@ -10,3 +10,5 @@ build/
 .ruff_cache/
 .opencode/
 data/results.jsonl
+data/postgres/
+data/vector_cache/
