@@ -1,13 +1,11 @@
-import type { EvaluationMetrics } from "@/types"
-
-function metricColor(v: number | null): string {
+function metricColor(v) {
   if (v === null) return "text-text-faint"
   if (v >= 0.8) return "text-green"
   if (v >= 0.5) return "text-amber"
   return "text-red"
 }
 
-function MetricBox({ label, value }: { label: string; value: React.ReactNode }) {
+function MetricBox({ label, value }) {
   return (
     <div className="bg-metric-bg rounded-[8px] px-2.5 py-1.5 min-w-[60px] flex-1 text-center">
       <div className="text-[0.55rem] font-semibold uppercase tracking-wider text-text-faint">{label}</div>
@@ -16,12 +14,7 @@ function MetricBox({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-interface MetricsGridProps {
-  evaluation: EvaluationMetrics
-  group: "retrieval" | "generation"
-}
-
-export function MetricsGrid({ evaluation, group }: MetricsGridProps) {
+export function MetricsGrid({ evaluation, group }) {
   const { hit_rate, mrr, precision, ndcg, exact_match, rouge_l_f1, semantic_similarity, faithfulness, answer_relevancy, llm_quality_score } = evaluation
 
   if (group === "retrieval") {

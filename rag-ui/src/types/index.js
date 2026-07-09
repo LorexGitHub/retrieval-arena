@@ -1,71 +1,4 @@
-export interface EvaluationMetrics {
-  hit_rate: number
-  mrr: number
-  precision: number
-  ndcg: number
-  exact_match: boolean
-  rouge_l_f1: number
-  semantic_similarity: number
-  faithfulness: number | null
-  answer_relevancy: number | null
-  llm_quality_score: number | null
-}
-
-export interface RetrievalResult {
-  model_name: string
-  documents: string[]
-  scores: number[]
-  document_ids: string[]
-}
-
-export interface GenerationResult {
-  answer: string
-}
-
-export interface RAGResult {
-  retrieval: RetrievalResult
-  generation: GenerationResult
-  evaluation: EvaluationMetrics
-}
-
-export interface CompareReport {
-  query: string
-  ground_truth: string
-  dataset: string
-  llm_model?: string
-  results: Record<string, RAGResult>
-  best_model: string | null
-}
-
-export interface QueryItem {
-  query: string
-  ground_truth: string
-  relevant_dataset: string
-}
-
-export interface SSEStage {
-  type: "stage"
-  message: string
-}
-
-export interface SSEMultiResult {
-  type: "result"
-  result: { reports: CompareReport[]; total: number }
-}
-
-export interface SSESingleResult {
-  type: "result"
-  result: CompareReport
-}
-
-export interface SSEError {
-  type: "error"
-  message: string
-}
-
-export type SSEEvent = SSEStage | SSESingleResult | SSEMultiResult | SSEError
-
-export const EMBEDDING_MODELS: Record<string, { model_name: string; size: string; memory: string; speed: string }> = {
+export const EMBEDDING_MODELS = {
   "minilm-l12": { model_name: "sentence-transformers/all-MiniLM-L12-v2", size: "33M", memory: "~90 MB", speed: "fast" },
   "bge-small": { model_name: "BAAI/bge-small-en-v1.5", size: "33M", memory: "~90 MB", speed: "fast" },
   "gte-small": { model_name: "thenlper/gte-small", size: "33M", memory: "~100 MB", speed: "fast" },
@@ -80,7 +13,7 @@ export const EMBEDDING_MODELS: Record<string, { model_name: string; size: string
 
 export const MODEL_KEYS = Object.keys(EMBEDDING_MODELS)
 
-export const LLM_MODELS: Record<string, { model_name: string; size: string; memory: string; speed: string }> = {
+export const LLM_MODELS = {
   smol: { model_name: "HuggingFaceTB/SmolLM2-135M-Instruct", size: "135M", memory: "~270 MB", speed: "fast" },
   smol360: { model_name: "HuggingFaceTB/SmolLM2-360M-Instruct", size: "360M", memory: "~720 MB", speed: "fast" },
   qwen2: { model_name: "Qwen/Qwen2.5-0.5B-Instruct", size: "0.5B", memory: "~1 GB", speed: "fast" },

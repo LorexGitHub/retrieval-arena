@@ -180,7 +180,8 @@ def _event_stream(msg_queue):
 def run_single(req: SingleRunRequest):
     documents = load_dataset(req.dataset_name)
     msg_queue = queue.Queue()
-    on_stage = lambda s: msg_queue.put(("stage", s))
+    def on_stage(s):
+        msg_queue.put(("stage", s))
     thread = threading.Thread(target=_run_pipeline_thread, args=(req, documents, on_stage, msg_queue), daemon=True)
     thread.start()
     return StreamingResponse(_event_stream(msg_queue), media_type="text/event-stream")

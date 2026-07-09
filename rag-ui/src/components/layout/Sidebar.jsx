@@ -3,27 +3,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
-interface SidebarProps {
-  datasets: string[]
-  selectedDataset: string
-  onDatasetChange: (val: string) => void
-  editText: string
-  onEditTextChange: (val: string) => void
-  onSave: () => void
-  onDelete: () => void
-  onAddDataset: (name: string, documents: string[]) => Promise<void>
-}
-
-export function Sidebar({
-  datasets,
-  selectedDataset,
-  onDatasetChange,
-  editText,
-  onEditTextChange,
-  onSave,
-  onDelete,
-  onAddDataset,
-}: SidebarProps) {
+export function Sidebar({ datasets, selectedDataset, onDatasetChange, editText, onEditTextChange, onSave, onDelete, onAddDataset }) {
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState("")
   const [newDocs, setNewDocs] = useState("")

@@ -1,6 +1,6 @@
 const API_BASE = "/api"
 
-export async function fetchDatasets(): Promise<string[]> {
+export async function fetchDatasets() {
   try {
     const res = await fetch(`${API_BASE}/datasets`)
     if (!res.ok) return []
@@ -11,7 +11,7 @@ export async function fetchDatasets(): Promise<string[]> {
   }
 }
 
-export async function fetchDatasetDocuments(name: string): Promise<string[] | Record<string, string>[]> {
+export async function fetchDatasetDocuments(name) {
   try {
     const res = await fetch(`${API_BASE}/datasets/${encodeURIComponent(name)}/documents`)
     if (!res.ok) return []
@@ -22,7 +22,7 @@ export async function fetchDatasetDocuments(name: string): Promise<string[] | Re
   }
 }
 
-export async function createDataset(name: string, documents: string[] | Record<string, string>[]): Promise<void> {
+export async function createDataset(name, documents) {
   try {
     await fetch(`${API_BASE}/datasets/${encodeURIComponent(name)}`, {
       method: "PUT",
@@ -34,7 +34,7 @@ export async function createDataset(name: string, documents: string[] | Record<s
   }
 }
 
-export async function deleteDataset(name: string): Promise<void> {
+export async function deleteDataset(name) {
   try {
     await fetch(`${API_BASE}/datasets/${encodeURIComponent(name)}`, {
       method: "DELETE",
@@ -44,7 +44,7 @@ export async function deleteDataset(name: string): Promise<void> {
   }
 }
 
-export async function fetchQueries(): Promise<{ query: string; ground_truth: string; relevant_dataset: string }[]> {
+export async function fetchQueries() {
   try {
     const res = await fetch(`${API_BASE}/queries`)
     if (!res.ok) return []
@@ -55,7 +55,7 @@ export async function fetchQueries(): Promise<{ query: string; ground_truth: str
   }
 }
 
-export async function fetchLLMs(): Promise<{ key: string; model_name: string; size: string; memory: string; speed: string }[]> {
+export async function fetchLLMs() {
   try {
     const res = await fetch(`${API_BASE}/llms`)
     if (!res.ok) return []
@@ -66,10 +66,10 @@ export async function fetchLLMs(): Promise<{ key: string; model_name: string; si
   }
 }
 
-export function getCompareURL(): string {
+export function getCompareURL() {
   return `${API_BASE}/compare`
 }
 
-export function getCompareMultiURL(): string {
+export function getCompareMultiURL() {
   return `${API_BASE}/compare-multi`
 }

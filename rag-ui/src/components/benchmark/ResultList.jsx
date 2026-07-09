@@ -3,10 +3,9 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { MetricsGrid } from "./MetricsGrid"
 import { DocumentList } from "./DocumentList"
 import { AnswerBlock } from "./AnswerBlock"
-import type { CompareReport, RAGResult } from "@/types"
 import { EMBEDDING_MODELS, LLM_MODELS } from "@/types"
 
-function pickBest(report: CompareReport): string | null {
+function pickBest(report) {
   const results = Object.entries(report.results).filter(([, r]) => !("error" in r && r.error))
   if (results.length === 0) return null
   const scored = results.map(([name, r]) => {
@@ -22,14 +21,7 @@ function pickBest(report: CompareReport): string | null {
   return scored[0]?.name ?? null
 }
 
-interface ResultCardProps {
-  modelName: string
-  result: RAGResult
-  isBest: boolean
-  topK: number
-}
-
-function ResultCard({ modelName, result, isBest, topK }: ResultCardProps) {
+function ResultCard({ modelName, result, isBest, topK }) {
   const ev = result.evaluation
   const ret = result.retrieval
   const gen = result.generation
@@ -42,11 +34,11 @@ function ResultCard({ modelName, result, isBest, topK }: ResultCardProps) {
     ev.answer_relevancy,
     ev.faithfulness ?? undefined,
     ev.llm_quality_score !== null ? ev.llm_quality_score / 5 : undefined,
-  ].filter((v): v is number => v !== undefined)
+  ].filter((v) => v !== undefined)
   const gScore = gVals.reduce((a, b) => a + b, 0) / gVals.length
 
   const oScore = (rScore + gScore) / 2
-  const sc = (v: number) => v >= 0.8 ? "#50D68A" : v >= 0.5 ? "#FFCF95" : "#D65050"
+  const sc = (v) => v >= 0.8 ? "#50D68A" : v >= 0.5 ? "#FFCF95" : "#D65050"
 
   return (
     <Accordion type="single" collapsible className="animate-fade-up">
@@ -89,13 +81,7 @@ function ResultCard({ modelName, result, isBest, topK }: ResultCardProps) {
   )
 }
 
-interface ResultListProps {
-  reports: CompareReport[]
-  topK: number
-  llmModel?: string
-}
-
-export function ResultList({ reports, topK, llmModel }: ResultListProps) {
+export function ResultList({ reports, topK, llmModel }) {
   if (reports.length === 0) {
     return <div className="text-text-faint text-sm text-center py-8">No results — check API logs</div>
   }
@@ -130,7 +116,7 @@ export function ResultList({ reports, topK, llmModel }: ResultListProps) {
                   <ResultCard
                     key={modelName}
                     modelName={modelName}
-                    result={result as RAGResult}
+                    result={result}
                     isBest={modelName === bestModel}
                     topK={topK}
                   />

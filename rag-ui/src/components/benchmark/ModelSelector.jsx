@@ -2,13 +2,8 @@ import { MODEL_KEYS, EMBEDDING_MODELS } from "@/types"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 
-interface ModelSelectorProps {
-  selected: string[]
-  onChange: (models: string[]) => void
-}
-
-export function ModelSelector({ selected, onChange }: ModelSelectorProps) {
-  const handleToggle = (key: string, checked: boolean) => {
+export function ModelSelector({ selected, onChange }) {
+  const handleToggle = (key, checked) => {
     if (checked) {
       onChange([...selected, key])
     } else {

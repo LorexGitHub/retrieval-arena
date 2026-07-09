@@ -1,6 +1,5 @@
 from .retriever import Retriever
 from .generator import get_generator
-from .evaluator import Evaluator
 from .schemas import RAGResult, GenerationResult
 
 

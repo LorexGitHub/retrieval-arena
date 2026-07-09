@@ -4,31 +4,19 @@ import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import type { QueryItem } from "@/types"
 import { LLM_MODELS, EMBEDDING_MODELS } from "@/types"
 
-interface RunPanelProps {
-  queries: QueryItem[]
-  selectedDatasets: string[]
-  onRun: (queries: { query: string; ground_truth: string }[], llmModel: string, models: string[]) => void
-  onClear: () => void
-  progress: string | null
-  progressPercent: number
-  loading: boolean
-  onCancel: () => void
-}
-
-export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, progressPercent, loading, onCancel }: RunPanelProps) {
+export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, progressPercent, loading, onCancel }) {
   const [queryInput, setQueryInput] = useState("")
   const [gtInput, setGtInput] = useState("")
   const [selectedModels, setSelectedModels] = useState(["minilm-l12", "bge-small", "gte-small"])
-  const [selectedSampleQueries, setSelectedSampleQueries] = useState<Set<number>>(new Set([0, 1, 2]))
+  const [selectedSampleQueries, setSelectedSampleQueries] = useState(new Set([0, 1, 2]))
   const [topK, setTopK] = useState(5)
   const [llmModel, setLlmModel] = useState("")
 
   const llmKeys = Object.keys(LLM_MODELS)
 
-  const toggleSample = (idx: number) => {
+  const toggleSample = (idx) => {
     setSelectedSampleQueries((prev) => {
       const next = new Set(prev)
       if (next.has(idx)) next.delete(idx)
@@ -38,7 +26,7 @@ export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, 
   }
 
   const handleEvaluate = () => {
-    const sampleItems: { query: string; ground_truth: string }[] = []
+    const sampleItems = []
     for (const idx of selectedSampleQueries) {
       if (queries[idx]) {
         sampleItems.push({ query: queries[idx].query, ground_truth: queries[idx].ground_truth })
@@ -92,7 +80,6 @@ export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, 
         </div>
       </div>
 
-      {/* Sample queries — multi-select */}
       <div className="text-text-faint text-[0.68rem] font-medium mt-3 mb-1.5">Samples</div>
       <div className="grid grid-cols-3 gap-2">
         {queries.slice(0, 9).map((q, i) => {
@@ -122,7 +109,6 @@ export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, 
         })}
       </div>
 
-      {/* Custom query */}
       <div className="mt-4 space-y-2">
         <input
           value={queryInput}
@@ -138,7 +124,6 @@ export function RunPanel({ queries, selectedDatasets, onRun, onClear, progress, 
         />
       </div>
 
-      {/* Models */}
       <div className="mt-3">
         <label className="text-xs text-text-faint font-medium">Models</label>
         <div className="flex flex-wrap gap-2 mt-1">

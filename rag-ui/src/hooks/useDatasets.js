@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback } from "react"
+﻿import { useState, useEffect, useCallback } from "react"
 import { fetchDatasets, fetchDatasetDocuments, createDataset, deleteDataset } from "@/lib/api"
 
-function extractId(text: string): string {
+function extractId(text) {
   const trimmed = text.trim()
   const dot = trimmed.indexOf(".")
   return dot > 0 ? trimmed.slice(0, dot).trim() : trimmed.split(",")[0].trim().slice(0, 60)
 }
 
 export function useDatasets() {
-  const [datasets, setDatasets] = useState<string[]>([])
-  const [selectedDataset, setSelectedDataset] = useState<string>("")
+  const [datasets, setDatasets] = useState([])
+  const [selectedDataset, setSelectedDataset] = useState("")
   const [editText, setEditText] = useState("")
 
   const refreshDatasets = useCallback(async () => {
@@ -33,9 +33,9 @@ export function useDatasets() {
     if (selectedDataset) {
       fetchDatasetDocuments(selectedDataset).then((docs) => {
         if (docs.length > 0 && typeof docs[0] === "object") {
-          setEditText((docs as Record<string, string>[]).map((d) => d.text).join("\n"))
+          setEditText(docs.map((d) => d.text).join("\n"))
         } else {
-          setEditText((docs as string[]).join("\n"))
+          setEditText(docs.join("\n"))
         }
       })
     }

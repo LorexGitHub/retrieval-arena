@@ -1,9 +1,4 @@
-interface DocumentListProps {
-  documents: string[]
-  scores: number[]
-}
-
-export function DocumentList({ documents, scores }: DocumentListProps) {
+export function DocumentList({ documents, scores }) {
   if (documents.length === 0) {
     return <div className="text-text-faint text-xs">—</div>
   }

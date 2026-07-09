@@ -3,17 +3,9 @@ import { Badge } from "@/components/ui/badge"
 import { MetricsGrid } from "./MetricsGrid"
 import { DocumentList } from "./DocumentList"
 import { AnswerBlock } from "./AnswerBlock"
-import type { RAGResult } from "@/types"
 import { EMBEDDING_MODELS } from "@/types"
 
-interface ResultCardProps {
-  modelName: string
-  result: RAGResult
-  isBest: boolean
-  topK: number
-}
-
-export function ResultCard({ modelName, result, isBest, topK }: ResultCardProps) {
+export function ResultCard({ modelName, result, isBest, topK }) {
   const ev = result.evaluation
   const ret = result.retrieval
   const gen = result.generation
@@ -26,11 +18,11 @@ export function ResultCard({ modelName, result, isBest, topK }: ResultCardProps)
     ev.answer_relevancy,
     ev.faithfulness ?? undefined,
     ev.llm_quality_score !== null ? ev.llm_quality_score / 5 : undefined,
-  ].filter((v): v is number => v !== undefined)
+  ].filter((v) => v !== undefined)
   const gScore = gVals.reduce((a, b) => a + b, 0) / gVals.length
 
   const oScore = (rScore + gScore) / 2
-  const sc = (v: number) => v >= 0.8 ? "#50D68A" : v >= 0.5 ? "#FFCF95" : "#D65050"
+  const sc = (v) => v >= 0.8 ? "#50D68A" : v >= 0.5 ? "#FFCF95" : "#D65050"
 
   return (
     <Accordion type="single" collapsible className="animate-fade-up">

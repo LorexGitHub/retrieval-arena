@@ -6,7 +6,6 @@ import { ResultList } from "@/components/benchmark/ResultList"
 import { useDatasets } from "@/hooks/useDatasets"
 import { getCompareMultiURL, fetchQueries } from "@/lib/api"
 import { createDataset } from "@/lib/api"
-import type { QueryItem, CompareReport } from "@/types"
 
 export default function App() {
   const {
@@ -20,14 +19,14 @@ export default function App() {
     refreshDatasets,
   } = useDatasets()
 
-  const [queries, setQueries] = useState<QueryItem[]>([])
-  const [selectedDatasets, setSelectedDatasets] = useState<string[]>([])
-  const [reports, setReports] = useState<CompareReport[]>([])
+  const [queries, setQueries] = useState([])
+  const [selectedDatasets, setSelectedDatasets] = useState([])
+  const [reports, setReports] = useState([])
   const [lastLlmModel, setLastLlmModel] = useState("")
-  const [progress, setProgress] = useState<string | null>(null)
+  const [progress, setProgress] = useState(null)
   const [progressPercent, setProgressPercent] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
+  const [abortController, setAbortController] = useState(null)
   const totalStepsRef = useRef(0)
   const processedRef = useRef(0)
 
@@ -41,16 +40,12 @@ export default function App() {
     }
   }, [datasets])
 
-  const handleAddDataset = useCallback(async (name: string, documents: string[]) => {
+  const handleAddDataset = useCallback(async (name, documents) => {
     await createDataset(name, documents)
     await refreshDatasets()
   }, [refreshDatasets])
 
-  const handleRun = useCallback(async (
-    items: { query: string; ground_truth: string }[],
-    llmModel: string,
-    models: string[],
-  ) => {
+  const handleRun = useCallback(async (items, llmModel, models) => {
     if (selectedDatasets.length === 0 || items.length === 0) return
 
     setReports([])
@@ -117,7 +112,7 @@ export default function App() {
           }
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err.name !== "AbortError") {
         console.error("Fetch error:", err)
       }

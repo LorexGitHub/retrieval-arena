@@ -1,12 +1,6 @@
 import { Button } from "@/components/ui/button"
-import type { QueryItem } from "@/types"
 
-interface SampleQueriesProps {
-  queries: QueryItem[]
-  onSelect: (query: string, groundTruth: string) => void
-}
-
-export function SampleQueries({ queries, onSelect }: SampleQueriesProps) {
+export function SampleQueries({ queries, onSelect }) {
   const samples = queries.slice(0, 9)
   return (
     <>

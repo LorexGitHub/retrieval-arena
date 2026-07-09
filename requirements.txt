@@ -2,7 +2,6 @@ fastapi
 uvicorn
 pydantic
 sentence-transformers
-streamlit
 requests
 celery[redis]==5.3.6
 redis==5.0.1
