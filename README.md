@@ -33,7 +33,6 @@ docker compose up --build -d
 │   ├── src/hooks/        # Custom React hooks
 │   └── src/lib/          # API client and utilities
 ├── data/                 # Datasets, queries, vector cache
-├── infra/                # Terraform + Nginx config
 ├── Dockerfile            # Multi-stage build
 └── docker-compose.yaml   # Full stack orchestration
 ```
