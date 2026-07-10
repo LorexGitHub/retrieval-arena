@@ -22,7 +22,7 @@ class JobManager:
     @staticmethod
     def submit_job(query: str, model: str = "all", dataset: str = "tech", ground_truth: str = "") -> dict:
         try:
-            from src.mcp.tasks import run_rag_task
+            from backend.mcp.tasks import run_rag_task
 
             job_id = str(uuid4())
             task = run_rag_task.delay(job_id, query, model, dataset)
@@ -42,9 +42,9 @@ class JobManager:
     @staticmethod
     def _run_sync(query: str, model: str = "all", dataset: str = "tech", ground_truth: str = "") -> dict:
         job_id = str(uuid4())
-        from rag.pipeline import RAGPipeline
-        from rag.config import EMBEDDING_MODELS
-        from rag.experiment import load_dataset
+        from backend.rag.pipeline import RAGPipeline
+        from backend.rag.config import EMBEDDING_MODELS
+        from backend.rag.experiment import load_dataset
 
         gt = ground_truth or "placeholder"
         pipeline = RAGPipeline()
@@ -79,10 +79,10 @@ class JobManager:
         with open(RESULTS_FILE, "a") as f:
             f.write(json.dumps(output) + "\n")
 
-        from src.rag.database import is_available as db_available
+        from backend.rag.database import is_available as db_available
         if db_available():
             try:
-                from src.rag.database import save_result
+                from backend.rag.database import save_result
                 save_result(job_id, query, model, dataset, output)
             except Exception:
                 pass
@@ -91,7 +91,7 @@ class JobManager:
 
     @staticmethod
     def check_status(job_id: str) -> dict:
-        from src.mcp.tasks import celery_app
+        from backend.mcp.tasks import celery_app
 
         try:
             result = celery_app.backend.get(f"rag:result:{job_id}")
@@ -107,10 +107,10 @@ class JobManager:
 
     @staticmethod
     def list_results(limit: int = 50, filter_model: str = None) -> list:
-        from src.rag.database import is_available as db_available
+        from backend.rag.database import is_available as db_available
         if db_available():
             try:
-                from src.rag.database import list_results as db_list
+                from backend.rag.database import list_results as db_list
                 return db_list(limit, filter_model)
             except Exception:
                 pass
@@ -131,10 +131,10 @@ class JobManager:
 
     @staticmethod
     def get_result(job_id: str) -> dict:
-        from src.rag.database import is_available as db_available
+        from backend.rag.database import is_available as db_available
         if db_available():
             try:
-                from src.rag.database import get_result as db_get
+                from backend.rag.database import get_result as db_get
                 return db_get(job_id)
             except Exception:
                 pass
@@ -249,9 +249,9 @@ async def list_tools():
 
 def _execute_tool_sync(name: str, arguments: dict) -> dict:
     if name == "list_datasets":
-        from src.rag.database import is_available as db_avail
+        from backend.rag.database import is_available as db_avail
         if db_avail():
-            from src.rag.database import get_datasets
+            from backend.rag.database import get_datasets
             datasets = get_datasets()
         else:
             import json
@@ -260,7 +260,7 @@ def _execute_tool_sync(name: str, arguments: dict) -> dict:
             datasets = list(json.loads(datasets_path.read_text()).keys())
         return {"datasets": datasets}
     elif name == "list_queries":
-        from src.rag.experiment import load_queries
+        from backend.rag.experiment import load_queries
         return {"queries": load_queries()}
     elif name == "submit_rag_job":
         return JobManager.submit_job(
@@ -281,9 +281,9 @@ def _execute_tool_sync(name: str, arguments: dict) -> dict:
         return JobManager.get_result(arguments["job_id"]) or {"error": "Not found"}
     elif name == "get_dataset":
         ds_name = arguments["name"]
-        from src.rag.database import is_available as db_avail
+        from backend.rag.database import is_available as db_avail
         if db_avail():
-            from src.rag.database import get_dataset_documents
+            from backend.rag.database import get_dataset_documents
             docs = get_dataset_documents(ds_name)
         else:
             import json
@@ -299,10 +299,10 @@ def _execute_tool_sync(name: str, arguments: dict) -> dict:
         data = json.loads(ds_path.read_text()) if ds_path.exists() else {}
         data[ds_name] = docs
         ds_path.write_text(json.dumps(data, indent=4))
-        from src.rag.database import is_available as db_avail
+        from backend.rag.database import is_available as db_avail
         if db_avail():
             try:
-                from src.rag.database import save_dataset
+                from backend.rag.database import save_dataset
                 save_dataset(ds_name, docs)
             except Exception:
                 pass
@@ -316,10 +316,10 @@ def _execute_tool_sync(name: str, arguments: dict) -> dict:
             ds_path.write_text(json.dumps(data, indent=4))
         else:
             return {"error": f"Dataset '{ds_name}' not found"}
-        from src.rag.database import is_available as db_avail
+        from backend.rag.database import is_available as db_avail
         if db_avail():
             try:
-                from src.rag.database import remove_dataset
+                from backend.rag.database import remove_dataset
                 remove_dataset(ds_name)
             except Exception:
                 pass
@@ -348,10 +348,10 @@ async def app(scope, receive, send):
         return
 
     if scope.get("path") == "/mcp/" and scope.get("method") == "GET":
-        from src.rag.database import is_available as db_available
+        from backend.rag.database import is_available as db_available
         if db_available():
             try:
-                from src.rag.database import init_db
+                from backend.rag.database import init_db
                 init_db()
             except Exception:
                 pass

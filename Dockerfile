@@ -1,9 +1,9 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend
 WORKDIR /app
-COPY rag-ui/package.json rag-ui/package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
-COPY rag-ui/ .
+COPY frontend/ .
 RUN npm run build
 
 # Stage 2: Python backend
@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Copy built frontend
-COPY --from=frontend /app/dist /app/rag-ui/dist
+COPY --from=frontend /app/dist /app/frontend/dist
 
 EXPOSE 8002
 
-CMD ["uvicorn", "src.combined_app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.combined_app:app", "--host", "0.0.0.0", "--port", "8000"]

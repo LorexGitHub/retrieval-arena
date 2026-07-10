@@ -36,10 +36,10 @@ class RAGTask(Task):
 @celery_app.task(base=RAGTask, bind=True)
 def run_rag_task(self, job_id: str, query: str, model: str, dataset: str):
     try:
-        from rag.pipeline import RAGPipeline
-        from rag.config import EMBEDDING_MODELS
-        from rag.experiment import load_dataset
-        from rag.database import is_available as db_available, save_result
+        from backend.rag.pipeline import RAGPipeline
+        from backend.rag.config import EMBEDDING_MODELS
+        from backend.rag.experiment import load_dataset
+        from backend.rag.database import is_available as db_available, save_result
 
         pipeline = RAGPipeline()
         documents = load_dataset(dataset)

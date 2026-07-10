@@ -37,7 +37,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn src.api.rag_api:app --host 0.0.0.0 --port 8002
+    command: uvicorn backend.api.rag_api:app --host 0.0.0.0 --port 8002
 
   combined:
     build: .
@@ -49,7 +49,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Default CMD: uvicorn src.combined_app:app --host 0.0.0.0 --port 8000
+    # Default CMD: uvicorn backend.combined_app:app --host 0.0.0.0 --port 8000
     # Serves frontend (/) + REST API (/api/) + MCP (/mcp/)
 
   celery-worker:
@@ -57,13 +57,13 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://rag:rag@postgres:5432/rag
-      - PYTHONPATH=/app/src
+      - PYTHONPATH=/app/backend
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A src.mcp.tasks worker --loglevel=info --concurrency=2
+    command: celery -A backend.mcp.tasks worker --loglevel=info --concurrency=2
     volumes:
       - ./data:/data
 
@@ -77,7 +77,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: python -m uvicorn src.mcp.mcp_server:app --host 0.0.0.0 --port 5100
+    command: python -m uvicorn backend.mcp.mcp_server:app --host 0.0.0.0 --port 5100
     volumes:
       - ./data:/data
 

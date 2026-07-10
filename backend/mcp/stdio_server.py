@@ -1,5 +1,5 @@
 """Stdio entry point for MCP server (for Claude Desktop)."""
-from src.mcp.mcp_server import server
+from backend.mcp.mcp_server import server
 from mcp.server.stdio import stdio_server
 import anyio
 

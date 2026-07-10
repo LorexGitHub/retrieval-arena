@@ -18,17 +18,17 @@ docker compose up --build -d
 - **Frontend**: React 19, JavaScript, Tailwind CSS v4, shadcn/ui, Vite
 - **Backend**: Python 3.12, FastAPI, Sentence-Transformers, Celery + Redis
 - **Database**: PostgreSQL 16, local file-based vector cache
-- **Infrastructure**: Docker Compose, Terraform + Hetzner
+- **Infrastructure**: Docker Compose
 
 ## Project Structure
 
 ```
-├── src/
+├── backend/
 │   ├── rag/              # RAG pipeline (retrieval, generation, evaluation)
 │   ├── api/              # FastAPI server with SSE streaming
 │   ├── mcp/              # MCP server for LLM tool integration
 │   └── combined_app.py   # Routes all traffic in single container
-├── rag-ui/               # React SPA
+├── frontend/             # React SPA
 │   ├── src/components/   # 18 components (layout, benchmark, UI primitives)
 │   ├── src/hooks/        # Custom React hooks
 │   └── src/lib/          # API client and utilities

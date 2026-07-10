@@ -9,12 +9,12 @@ import threading
 import queue
 from pathlib import Path
 
-from src.rag.experiment import run_batch, load_queries, load_dataset, DATA_DIR
-from src.rag.config import EMBEDDING_MODELS, LLM_MODELS
-from src.rag.pipeline import RAGPipeline
-from src.rag.database import is_available as db_available
+from backend.rag.experiment import run_batch, load_queries, load_dataset, DATA_DIR
+from backend.rag.config import EMBEDDING_MODELS, LLM_MODELS
+from backend.rag.pipeline import RAGPipeline
+from backend.rag.database import is_available as db_available
 
-STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "rag-ui" / "dist"
+STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 api = APIRouter(prefix="/api")
 
@@ -73,7 +73,7 @@ def list_llms():
 @api.get("/datasets")
 def list_datasets():
     if db_available():
-        from src.rag.database import get_datasets
+        from backend.rag.database import get_datasets
         try:
             return {"available_datasets": get_datasets()}
         except Exception:
@@ -87,7 +87,7 @@ def list_datasets():
 @api.get("/datasets/{dataset_name}/documents")
 def get_dataset_documents(dataset_name: str):
     if db_available():
-        from src.rag.database import get_dataset_documents as db_docs
+        from backend.rag.database import get_dataset_documents as db_docs
         try:
             docs = db_docs(dataset_name)
             return {"dataset_name": dataset_name, "documents": docs}
@@ -107,7 +107,7 @@ def get_dataset_documents(dataset_name: str):
 @api.put("/datasets/{dataset_name}")
 def create_dataset(dataset_name: str, req: CreateDatasetRequest):
     if db_available():
-        from src.rag.database import save_dataset
+        from backend.rag.database import save_dataset
         try:
             save_dataset(dataset_name, req.documents)
             return {"message": f"Dataset '{dataset_name}' saved", "documents": req.documents}
@@ -123,7 +123,7 @@ def create_dataset(dataset_name: str, req: CreateDatasetRequest):
 @api.delete("/datasets/{dataset_name}")
 def delete_dataset(dataset_name: str):
     if db_available():
-        from src.rag.database import remove_dataset
+        from backend.rag.database import remove_dataset
         try:
             remove_dataset(dataset_name)
             return {"message": f"Dataset '{dataset_name}' deleted"}
@@ -303,7 +303,7 @@ def run_batch_endpoint(req: BatchRunRequest):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if db_available():
-        from src.rag.database import init_db
+        from backend.rag.database import init_db
         try:
             init_db()
         except Exception:
