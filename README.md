@@ -1,4 +1,5 @@
-# RAG Embedding Benchmark
+# retrieval-arena
+
 
 Evaluate and compare embedding models for retrieval-augmented generation across 10 metrics (4 retrieval + 6 generation). Results are accessible via a React dashboard, REST API, or an MCP server for LLM tool integration.
 
