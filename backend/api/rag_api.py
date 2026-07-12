@@ -59,6 +59,13 @@ class CreateDatasetRequest(BaseModel):
     documents: list[str] | list[dict]
 
 
+class IngestURLRequest(BaseModel):
+    url: str
+    name: str
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+
+
 @api.get("/models")
 def list_models():
     return {"available_models": list(EMBEDDING_MODELS.keys())}
@@ -135,6 +142,16 @@ def delete_dataset(dataset_name: str):
         del data[dataset_name]
         datasets_path.write_text(json.dumps(data, indent=4))
     return {"message": f"Dataset '{dataset_name}' deleted"}
+
+
+@api.post("/ingest-url")
+def ingest_url(req: IngestURLRequest):
+    from backend.rag.web_loader import ingest_url as do_ingest
+    try:
+        result = do_ingest(req.url, req.name, chunk_size=req.chunk_size, chunk_overlap=req.chunk_overlap)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @api.get("/queries")

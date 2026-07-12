@@ -1,0 +1,28 @@
+{
+  "run_name": "thesis_sweep_k5",
+  "timestamp": "20260711_195712",
+  "num_queries": 20,
+  "top_k": 5,
+  "models": [
+    "bge-base",
+    "bge-large",
+    "bge-small",
+    "granite",
+    "gte-small",
+    "harrier",
+    "jina",
+    "minilm-l12",
+    "mpnet",
+    "qwen3"
+  ],
+  "datasets": [
+    "cars",
+    "cuisines",
+    "music_genres",
+    "programming_languages",
+    "science_fields",
+    "sports",
+    "tech_companies"
+  ],
+  "total_evaluations": 200
+}

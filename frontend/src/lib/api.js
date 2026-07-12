@@ -66,6 +66,23 @@ export async function fetchLLMs() {
   }
 }
 
+export async function ingestUrl(url, name, chunkSize = 500, chunkOverlap = 50) {
+  try {
+    const res = await fetch(`${API_BASE}/ingest-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, name, chunk_size: chunkSize, chunk_overlap: chunkOverlap }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${res.status}`)
+    }
+    return await res.json()
+  } catch (e) {
+    throw e
+  }
+}
+
 export function getCompareURL() {
   return `${API_BASE}/compare`
 }

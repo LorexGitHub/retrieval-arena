@@ -1,113 +1,72 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import TYPE_CHECKING
+import os
 
 from .config import EMBEDDING_MODELS, RETRIEVAL_TOP_K
 from .schemas import RetrievalResult
 
-if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer
-
-# Config keys that should NOT be forwarded to SentenceTransformer()
-_MODEL_KWARGS_SKIP = {"model_name", "default_task", "encode_kwargs", "size", "memory", "speed"}
-
 # Normalized model name lookup (case-insensitive)
 _MODEL_NAME_MAP = {k.lower(): k for k in EMBEDDING_MODELS}
 
-# Estimated memory per model (GB) for cache budgeting
-_MODEL_MEMORY_ESTIMATES = {
-    "sentence-transformers/all-MiniLM-L12-v2": 0.09,
-    "BAAI/bge-small-en-v1.5": 0.09,
-    "thenlper/gte-small": 0.10,
-    "ibm-granite/granite-embedding-small-english-r2": 0.20,
-    "microsoft/harrier-oss-v1-270m": 0.55,
-    "BAAI/bge-base-en-v1.5": 0.25,
-    "sentence-transformers/all-mpnet-base-v2": 0.25,
-    "Qwen/Qwen3-Embedding-0.6B": 1.20,
-    "jinaai/jina-embeddings-v5-text-small": 1.20,
-    "BAAI/bge-large-en-v1.5": 0.70,
-}
+# Module-level embedding model cache survives across _retrieve_sync calls
+_EMBEDDING_CACHE: dict[str, any] = {}
 
-# In-memory model cache: populated only if enough RAM is available
-_MODEL_CACHE: dict[str, SentenceTransformer] = {}
-_MODEL_CACHE_ENABLED = False
+# Always use in-process retrieval on Windows; subprocess path freezes memory on exit
+_USE_SYNC = os.name == "nt" or mp.current_process().daemon
 
 
-def _check_cache_feasible() -> bool:
-    total_est = sum(_MODEL_MEMORY_ESTIMATES.values())
-    try:
-        with open("/proc/meminfo") as f:
-            mem = {}
-            for line in f:
-                k, v = line.split(":")
-                mem[k.strip()] = int(v.strip().split()[0])
-        avail_gb = mem.get("MemAvailable", 0) / 1024 / 1024
-        return avail_gb > total_est * 1.5
-    except Exception:
-        return False
-
-
-_MODEL_CACHE_ENABLED = _check_cache_feasible()
-
-
-def _get_model(model_id: str, model_kwargs: dict) -> SentenceTransformer:
-    from sentence_transformers import SentenceTransformer
-
-    if _MODEL_CACHE_ENABLED:
-        model = _MODEL_CACHE.get(model_id)
-        if model is not None:
-            return model
-        model = SentenceTransformer(model_id, **model_kwargs)
-        _MODEL_CACHE[model_id] = model
-        return model
-    return SentenceTransformer(model_id, **model_kwargs)
-
-
-def _retrieve_worker(
-    query: str,
-    documents: list[str],
-    model_id: str,
-    model_kwargs: dict,
-    encode_kwargs: dict,
-    top_k: int,
-    result_queue: mp.Queue,
-):
+def _retrieve_worker(query, documents, model_id, top_k, result_queue):
     """Run inside a child process so all model memory is freed on exit."""
     try:
-        from sentence_transformers import util
+        from langchain_huggingface import HuggingFaceEmbeddings
+        from langchain_core.vectorstores import InMemoryVectorStore
 
-        model = _get_model(model_id, model_kwargs)
-        doc_embs = model.encode(documents, convert_to_tensor=True, **encode_kwargs)
-        query_emb = model.encode(query, convert_to_tensor=True, **encode_kwargs)
-        scores = util.cos_sim(query_emb, doc_embs)[0]
-        top_indices = scores.argsort(descending=True)[:top_k].tolist()
+        embeddings = HuggingFaceEmbeddings(model_name=model_id)
+        vectorstore = InMemoryVectorStore.from_texts(documents, embeddings)
+        results = vectorstore.similarity_search_with_score(query, k=top_k)
 
         result_queue.put({
-            "documents": [documents[i] for i in top_indices],
-            "scores": [float(scores[i]) for i in top_indices],
+            "documents": [r[0].page_content for r in results],
+            "scores": [r[1] for r in results],
         })
     except Exception as e:
         result_queue.put({"error": str(e)})
 
 
-def _retrieve_sync(
-    query: str,
-    documents: list[str],
-    model_id: str,
-    model_kwargs: dict,
-    encode_kwargs: dict,
-    top_k: int,
-) -> tuple[list[str], list[float]]:
-    """Run in-process with model caching when feasible."""
-    from sentence_transformers import util
+def _get_embeddings(model_name: str, model_config: dict | None = None):
+    """Return cached HuggingFaceEmbeddings instance."""
+    if model_name not in _EMBEDDING_CACHE:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        kwargs = {"model_name": model_name}
+        model_kwargs = {}
+        encode_kwargs = {}
+        if model_config:
+            if model_config.get("trust_remote_code"):
+                model_kwargs["trust_remote_code"] = True
+            task = model_config.get("default_task")
+            if task:
+                encode_kwargs["task"] = task
+            ek = model_config.get("encode_kwargs")
+            if ek:
+                encode_kwargs.update(ek)
+        if model_kwargs:
+            kwargs["model_kwargs"] = model_kwargs
+        if encode_kwargs:
+            kwargs["encode_kwargs"] = encode_kwargs
+        _EMBEDDING_CACHE[model_name] = HuggingFaceEmbeddings(**kwargs)
+    return _EMBEDDING_CACHE[model_name]
 
-    model = _get_model(model_id, model_kwargs)
-    doc_embs = model.encode(documents, convert_to_tensor=True, **encode_kwargs)
-    query_emb = model.encode(query, convert_to_tensor=True, **encode_kwargs)
-    scores = util.cos_sim(query_emb, doc_embs)[0]
-    top_indices = scores.argsort(descending=True)[:top_k].tolist()
-    return [documents[i] for i in top_indices], [float(scores[i]) for i in top_indices]
+
+def _retrieve_sync(query, documents, model_id, top_k, model_config=None):
+    """Run in-process with model caching when feasible."""
+    from langchain_core.vectorstores import InMemoryVectorStore
+
+    embeddings = _get_embeddings(model_id, model_config)
+    vectorstore = InMemoryVectorStore.from_texts(documents, embeddings)
+    results = vectorstore.similarity_search_with_score(query, k=top_k)
+
+    return [r[0].page_content for r in results], [r[1] for r in results]
 
 
 class Retriever:
@@ -124,7 +83,6 @@ class Retriever:
         if resolved is None:
             raise KeyError(f"Unknown embedding model: {model_name}")
 
-        # Normalize: extract texts and IDs whether input is list[str] or list[dict]
         if documents and isinstance(documents[0], dict):
             doc_ids = [d["id"] for d in documents]
             doc_texts = [d["text"] for d in documents]
@@ -148,24 +106,14 @@ class Retriever:
         model_cfg = EMBEDDING_MODELS[resolved]
         model_id = model_cfg["model_name"]
 
-        model_kwargs = {k: v for k, v in model_cfg.items() if k not in _MODEL_KWARGS_SKIP}
-
-        encode_kwargs = {}
-        task = model_cfg.get("default_task")
-        if task:
-            encode_kwargs["task"] = task
-        extra_encode = model_cfg.get("encode_kwargs")
-        if extra_encode:
-            encode_kwargs.update(extra_encode)
-
-        if _MODEL_CACHE_ENABLED or mp.current_process().daemon:
-            docs, scores = _retrieve_sync(query, doc_texts, model_id, model_kwargs, encode_kwargs, top_k)
+        if _USE_SYNC:
+            docs, scores = _retrieve_sync(query, doc_texts, model_id, top_k, model_cfg)
         else:
             ctx = mp.get_context("spawn")
             q = ctx.Queue()
             p = ctx.Process(
                 target=_retrieve_worker,
-                args=(query, doc_texts, model_id, model_kwargs, encode_kwargs, top_k, q),
+                args=(query, doc_texts, model_id, top_k, q),
             )
             p.start()
             try:
@@ -180,7 +128,6 @@ class Retriever:
                 raise RuntimeError(data["error"])
             docs, scores = data["documents"], data["scores"]
 
-        # Map result indices back to IDs
         result_ids = [doc_ids[doc_texts.index(d)] for d in docs]
 
         result = RetrievalResult(
@@ -193,9 +140,7 @@ class Retriever:
 
         if dataset_name:
             try:
-                from sentence_transformers import SentenceTransformer
-                model_obj = SentenceTransformer(model_id, **model_kwargs)
-                query_vec = model_obj.encode(query, convert_to_tensor=False, **encode_kwargs).tolist()
+                query_vec = _get_embeddings(model_id, model_cfg).embed_query(query)
                 set_cache(query, resolved, dataset_name, {
                     "documents": docs,
                     "scores": scores,

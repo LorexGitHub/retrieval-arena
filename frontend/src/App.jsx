@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { RunPanel } from "@/components/benchmark/RunPanel"
 import { ResultList } from "@/components/benchmark/ResultList"
 import { useDatasets } from "@/hooks/useDatasets"
-import { getCompareMultiURL, fetchQueries } from "@/lib/api"
+import { getCompareMultiURL, fetchQueries, ingestUrl } from "@/lib/api"
 import { createDataset } from "@/lib/api"
 
 export default function App() {
@@ -42,6 +42,11 @@ export default function App() {
 
   const handleAddDataset = useCallback(async (name, documents) => {
     await createDataset(name, documents)
+    await refreshDatasets()
+  }, [refreshDatasets])
+
+  const handleIngestUrl = useCallback(async (url, name, chunkSize) => {
+    await ingestUrl(url, name, chunkSize)
     await refreshDatasets()
   }, [refreshDatasets])
 
@@ -147,6 +152,7 @@ export default function App() {
             onSave={handleSave}
             onDelete={handleDelete}
             onAddDataset={handleAddDataset}
+            onIngestUrl={handleIngestUrl}
           />
         </aside>
 

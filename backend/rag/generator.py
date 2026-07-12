@@ -6,6 +6,9 @@ import multiprocessing as mp
 
 from .config import LLM_MODELS, DEFAULT_LLM, LLM_BASE_URL, LLM_API_KEY, GENERATOR
 
+# Module-level pipeline cache survives across _generate_sync calls
+_PIPELINE_CACHE: dict[str, any] = {}
+
 
 class Generator:
     def generate(self, query: str, context: list[str]) -> str:
@@ -61,6 +64,7 @@ def _llm_worker(model_id: str, query: str, context: list[str], result_queue: mp.
     """Load model, generate, and return result. Runs in child process so memory is freed on exit."""
     try:
         from transformers import pipeline as hf_pipeline
+
         kwargs = {
             "model": model_id,
             "dtype": "auto",
@@ -72,6 +76,7 @@ def _llm_worker(model_id: str, query: str, context: list[str], result_queue: mp.
         except ImportError:
             pass
         pipe = hf_pipeline("text-generation", **kwargs)
+
         context_str = ", ".join(context)
 
         if pipe.tokenizer.chat_template:
@@ -89,17 +94,9 @@ def _llm_worker(model_id: str, query: str, context: list[str], result_queue: mp.
                 f"Answer:"
             )
 
-        result = pipe(
-            prompt,
-            max_new_tokens=64,
-            temperature=0.1,
-            do_sample=False,
-            repetition_penalty=1.2,
-            eos_token_id=pipe.tokenizer.eos_token_id,
-            pad_token_id=pipe.tokenizer.pad_token_id or pipe.tokenizer.eos_token_id,
-        )
-        text = result[0]["generated_text"][len(prompt):].strip()
-        result_queue.put({"answer": text.split("\n")[0][:200]})
+        output = pipe(prompt, max_new_tokens=256, return_full_text=False)
+        answer = output[0]["generated_text"]
+        result_queue.put({"answer": answer.strip().split("\n")[0][:200]})
     except Exception as e:
         result_queue.put({"error": str(e)})
 
@@ -111,6 +108,8 @@ class _LocalLLM(Generator):
         self.model_id = model_id
 
     def generate(self, query: str, context: list[str]) -> str:
+        if os.name == "nt":
+            return _generate_sync(self.model_id, query, context)
         ctx = mp.get_context("spawn")
         q = ctx.Queue()
         p = ctx.Process(
@@ -129,6 +128,49 @@ class _LocalLLM(Generator):
         if "error" in data:
             raise RuntimeError(data["error"])
         return data["answer"]
+
+
+def _generate_sync(model_id: str, query: str, context: list[str]) -> str:
+    """Run LLM generation in-process (Windows fallback)."""
+    try:
+        if model_id not in _PIPELINE_CACHE:
+            from transformers import pipeline as hf_pipeline
+
+            kwargs = {
+                "model": model_id,
+                "dtype": "auto",
+                "model_kwargs": {"low_cpu_mem_usage": True},
+            }
+            try:
+                import accelerate  # noqa: F401
+                kwargs["device_map"] = "auto"
+            except ImportError:
+                pass
+            _PIPELINE_CACHE[model_id] = hf_pipeline("text-generation", **kwargs)
+        pipe = _PIPELINE_CACHE[model_id]
+
+        context_str = ", ".join(context)
+
+        if pipe.tokenizer.chat_template:
+            messages = [
+                {"role": "system", "content": f"You have access to this context: {context_str}. Answer concisely."},
+                {"role": "user", "content": query},
+            ]
+            prompt = pipe.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            prompt = (
+                f"Context: {context_str}\n"
+                f"Question: {query}\n"
+                f"Answer:"
+            )
+
+        output = pipe(prompt, max_new_tokens=256, return_full_text=False)
+        answer = output[0]["generated_text"]
+        return answer.strip().split("\n")[0][:200]
+    except Exception as e:
+        raise RuntimeError(str(e))
 
 
 class _OllamaGenerator(Generator):

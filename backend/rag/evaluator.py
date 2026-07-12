@@ -1,30 +1,42 @@
 import math
+import re
 
 from sentence_transformers import SentenceTransformer, util
-from .config import EVAL_SEMANTIC_MODEL
+from .config import EVAL_SEMANTIC_MODEL, EVAL_JUDGE_MODEL
 from .schemas import EvaluationMetrics
-from .generator import get_generator, _TemplateGenerator
+from .generator import get_generator, _TemplateGenerator, _LocalLLM
+
+# Module-level caches survive across Evaluator instances
+_SEMANTIC_MODEL_CACHE: dict[str, SentenceTransformer] = {}
+_JUDGE_CACHE: dict[str, _LocalLLM | None] = {}
 
 
 class Evaluator:
-    def __init__(self):
-        self._semantic_model = None
-        self._judge = None
-
     def _get_semantic_model(self):
-        if self._semantic_model is None:
-            self._semantic_model = SentenceTransformer(EVAL_SEMANTIC_MODEL)
-        return self._semantic_model
+        key = EVAL_SEMANTIC_MODEL
+        if key not in _SEMANTIC_MODEL_CACHE:
+            _SEMANTIC_MODEL_CACHE[key] = SentenceTransformer(EVAL_SEMANTIC_MODEL)
+        return _SEMANTIC_MODEL_CACHE[key]
 
     def _get_judge(self):
-        if self._judge is not None:
-            return self._judge
+        key = EVAL_JUDGE_MODEL
+        if key in _JUDGE_CACHE:
+            return _JUDGE_CACHE[key]
         gen = get_generator()
         if isinstance(gen, _TemplateGenerator):
-            self._judge = False
-            return None
-        self._judge = gen
-        return self._judge
+            from .config import LLM_MODELS
+            if EVAL_JUDGE_MODEL in LLM_MODELS:
+                try:
+                    model_id = LLM_MODELS[EVAL_JUDGE_MODEL]["model_name"]
+                    gen = _LocalLLM(model_id)
+                except Exception:
+                    _JUDGE_CACHE[key] = None
+                    return None
+            else:
+                _JUDGE_CACHE[key] = None
+                return None
+        _JUDGE_CACHE[key] = gen
+        return _JUDGE_CACHE[key]
 
     # --- Retrieval metrics ---
 
@@ -88,6 +100,16 @@ class Evaluator:
         emb_ref = model.encode(reference, convert_to_tensor=True)
         return float(util.cos_sim(emb_gen, emb_ref)[0][0])
 
+    def _extract_number(self, text: str) -> float | None:
+        """Extract the first floating-point number from text."""
+        nums = re.findall(r"(\d+\.?\d*)", text)
+        if nums:
+            try:
+                return float(nums[0])
+            except (ValueError, TypeError):
+                return None
+        return None
+
     def faithfulness(self, answer: str, context: list[str]) -> float | None:
         judge = self._get_judge()
         if not judge:
@@ -103,7 +125,10 @@ class Evaluator:
                 "Fraction of supported claims:"
             )
             result = judge.generate(prompt, [])
-            return min(max(float(result.strip()), 0.0), 1.0)
+            num = self._extract_number(result)
+            if num is not None:
+                return min(max(num, 0.0), 1.0)
+            return None
         except Exception:
             return None
 
@@ -127,7 +152,10 @@ class Evaluator:
                 f"Only output a number between 1 and 5:",
                 [],
             )
-            return float(text.strip())
+            num = self._extract_number(text)
+            if num is not None:
+                return min(max(num, 1.0), 5.0)
+            return None
         except Exception:
             return None
 

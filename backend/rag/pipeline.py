@@ -1,6 +1,16 @@
 from .retriever import Retriever
 from .generator import get_generator
 from .schemas import RAGResult, GenerationResult
+from .evaluator import Evaluator
+
+_EVAL_CACHE = None
+
+
+def _get_evaluator():
+    global _EVAL_CACHE
+    if _EVAL_CACHE is None:
+        _EVAL_CACHE = Evaluator()
+    return _EVAL_CACHE
 
 
 class RAGPipeline:
@@ -43,5 +53,4 @@ class RAGPipeline:
 
     @property
     def evaluator(self):
-        from .evaluator import Evaluator
-        return Evaluator()
+        return _get_evaluator()

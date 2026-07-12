@@ -1,0 +1,12 @@
+{
+  "run_name": "baseline",
+  "timestamp": "20260711_105123",
+  "num_queries": 2,
+  "models": [
+    "minilm-l12",
+    "bge-small"
+  ],
+  "top_k": 5,
+  "dataset": "cars",
+  "elapsed_seconds": 360.7
+}
