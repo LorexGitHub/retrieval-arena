@@ -8,7 +8,6 @@ Usage:
 """
 
 import argparse
-import itertools
 import sys
 import time
 from pathlib import Path
@@ -16,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from backend.rag.config import EMBEDDING_MODELS
-from backend.rag.experiment import load_queries, run_batch, save_experiment_run, RESULTS_DIR
+from backend.rag.experiment import load_queries, run_batch, save_experiment_run
 
 
 def resolve_models(model_arg: str) -> list[str]:
@@ -119,7 +118,7 @@ def run_experiments(queries, models, top_k_values, datasets, name, yes=False, dr
             "total_evaluations": sum(p["num_queries"] for p in plan if p["top_k"] == k),
         }
         paths = save_experiment_run(all_reports, label, meta)
-        print(f"  Results saved to:")
+        print("  Results saved to:")
         for key, p in paths.items():
             print(f"    {key}: {p}")
 
@@ -148,7 +147,7 @@ def main():
         args.models = "all"
         args.datasets = "all"
 
-    print(f"=== RAG Batch Experiment ===\n")
+    print("=== RAG Batch Experiment ===\n")
 
     t_start = time.time()
     print("Loading queries...")

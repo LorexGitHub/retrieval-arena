@@ -34,8 +34,9 @@ def create_llm(model_id: str):
         "model_kwargs": {"low_cpu_mem_usage": True},
     }
     try:
-        import accelerate
-        kwargs["device_map"] = "auto"
+        import importlib.util
+        if importlib.util.find_spec("accelerate") is not None:
+            kwargs["device_map"] = "auto"
     except ImportError:
         pass
 
