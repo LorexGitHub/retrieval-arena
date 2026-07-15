@@ -51,7 +51,7 @@ docker compose up --build -d
 ## Frontend Development
 
 ```bash
-cd rag-ui
+cd frontend
 npm install
 npm run dev
 ```
@@ -71,6 +71,25 @@ Opens at `http://localhost:5173` — proxies `/api/*` to `http://localhost:8765`
 | POST | `/api/run` | Single-model RAG with SSE |
 | POST | `/api/compare` | Multi-model comparison with SSE |
 | POST | `/api/compare-multi` | Multi-query × multi-model with SSE |
+| POST | `/api/ingest-url` | Fetch URL, chunk, create dataset |
+
+## Batch Experiment CLI (Thesis Runs)
+
+```bash
+# Full sweep: all 10 models × 7 datasets × top-k=3,5,10
+python -m backend.cli.experiment --all --top-k 3,5,10 --name thesis --yes
+
+# Dry-run to preview plan
+python -m backend.cli.experiment --all --top-k 5 --dry-run
+
+# Custom subset
+python -m backend.cli.experiment --models minilm-l12,bge-small --top-k 5 --datasets cars,cuisines --name quick_test
+```
+
+Outputs per `top_k` saved to `data/runs/`:
+- `{name}_k{top_k}.csv` — flattened results (query × model)
+- `{name}_k{top_k}_aggregate.csv` — mean/std/min/max per model per metric
+- Meta JSON with run configuration
 
 ## MCP Tools (Claude Desktop)
 
